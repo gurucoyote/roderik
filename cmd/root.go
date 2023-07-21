@@ -45,6 +45,7 @@ func init() {
 	RootCmd.AddCommand(WalkCmd)
 	RootCmd.AddCommand(ParentCmd)
 	RootCmd.AddCommand(ChildCmd)
+	RootCmd.AddCommand(ShapeCmd)
 }
 func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 	// Ensure user data directory exists
