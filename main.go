@@ -1,22 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
-	"github.com/spf13/cobra"
-)
 
-var page *rod.Page
-var currentElement *rod.Element
-import (
-	"fmt"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/spf13/cobra"
