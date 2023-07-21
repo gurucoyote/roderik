@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/go-rod/rod/lib/proto"
 )
 
 var ClickCmd = &cobra.Command{
@@ -11,7 +13,7 @@ var ClickCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
-		err := CurrentElement.Click()
+		err := CurrentElement.Click(proto.InputMouseButtonLeft, 1)
 		if err != nil {
 			fmt.Println("Error clicking on the current element:", err)
 			return
