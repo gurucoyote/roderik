@@ -12,6 +12,22 @@ func init() {
 	RootCmd.AddCommand(ParentCmd)
 	RootCmd.AddCommand(ChildCmd)
 	RootCmd.AddCommand(HeadCmd)
+	RootCmd.AddCommand(BodyCmd)
+}
+
+var BodyCmd = &cobra.Command{
+	Use:   "body",
+	Short: "Navigate to the document's body",
+	Run: func(cmd *cobra.Command, args []string) {
+		bodyElement, err := Page.Element("body")
+		if err != nil {
+			fmt.Println("Error navigating to the document's body:", err)
+			return
+		}
+		CurrentElement = bodyElement
+		fmt.Println("Navigated to the document's body.")
+		ReportElement(CurrentElement)
+	},
 }
 
 var HeadCmd = &cobra.Command{
