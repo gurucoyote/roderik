@@ -17,19 +17,20 @@ func main() {
 			panic(err)
 		}
 
-		if char == ':' {
+		switch {
+		case char == ':':
 			commandMode()
-		} else if key == keyboard.KeyEsc {
+		case key == keyboard.KeyEsc:
 			break
-		} else if key == keyboard.KeyArrowUp {
+		case key == keyboard.KeyArrowUp:
 			fmt.Println("You pressed: Up Arrow")
-		} else if key == keyboard.KeyArrowDown {
+		case key == keyboard.KeyArrowDown:
 			fmt.Println("You pressed: Down Arrow")
-		} else if key == keyboard.KeyArrowLeft {
+		case key == keyboard.KeyArrowLeft:
 			fmt.Println("You pressed: Left Arrow")
-		} else if key == keyboard.KeyArrowRight {
+		case key == keyboard.KeyArrowRight:
 			fmt.Println("You pressed: Right Arrow")
-		} else {
+		default:
 			fmt.Printf("You pressed: rune %q, key %X\r\n", char, key)
 		}
 	}
