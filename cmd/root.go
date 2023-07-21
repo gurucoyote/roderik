@@ -111,3 +111,11 @@ func prettyPrintJson(s string) string {
 	b, _ := json.MarshalIndent(i, "", "  ")
 	return string(b)
 }
+  func ReportElement(el *rod.Element) {
+      tagName := el.MustEval("() => this.tagName").String()
+      childrenCount := el.MustElementCount("() => this.children.length")
+      text := el.MustText()
+
+      fmt.Printf("%s, %d children, %s\n", tagName, childrenCount, text)
+  }
+

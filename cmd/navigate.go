@@ -93,7 +93,6 @@ var ParentCmd = &cobra.Command{
 		}
 		CurrentElement = parentElement
 		fmt.Println("Navigated to the parent element.")
-		fmt.Println("Tag name of the parent element:", parentElement.MustEval("() => this.tagName").String())
-		fmt.Println("Text of the parent element:", parentElement.MustText())
+		ReportElement(CurrentElement)
 	},
 }
