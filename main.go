@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"encoding/json"
+	"os"
+
+	"path/filepath"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
-	"os"
-	"path/filepath"
 )
 
 func main() {
@@ -69,10 +71,6 @@ func main() {
 		fmt.Println(description)
 	}
 }
-import (
-	"encoding/json"
-	"fmt"
-)
 
 // PrettyPrint function
 func PrettyPrint(v interface{}) {
