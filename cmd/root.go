@@ -10,6 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var Page *rod.Page
+var CurrentElement *rod.Element
+
 var RootCmd = &cobra.Command{
 	Use:   "roderik",
 	Short: "A brief description of your application",
