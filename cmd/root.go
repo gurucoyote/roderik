@@ -65,8 +65,8 @@ func PrepareBrowser() (*rod.Browser, error) {
 	}
 
 	// Get the browser executable path
-	path, err := launcher.LookPath()
-	if err != nil {
+	path, found := launcher.LookPath()
+	if !found {
 		return nil, err
 	}
 	u := launcher.New().Bin(path).
