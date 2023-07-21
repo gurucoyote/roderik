@@ -65,13 +65,20 @@ func main() {
 	// Output the font-family, size, and position of the first heading element
 	if len(headings) > 0 {
 		firstHeading := headings[0]
-		style := firstHeading.MustEval(`getComputedStyle(this)`).Object()
-		fontFamily := style.Get("fontFamily").String()
-		fontSize := style.Get("fontSize").String()
-		rect := firstHeading.MustShape().First().Get("boundingBox").Object()
-		top := rect.Get("y").Int()
-		left := rect.Get("x").Int()
+		description := firstHeading.MustDescribe()
+		computedStyles := description.ComputedStyles
+		var fontFamily, fontSize string
+		for _, style := range computedStyles {
+			if style.Name == "font-family" {
+				fontFamily = style.Value
+			} else if style.Name == "font-size" {
+				fontSize = style.Value
+			}
+		}
+		rect := description.LayoutTreeNodes[0].BoundingBox
+		top := rect.Y
+		left := rect.X
 
-		fmt.Printf("First heading element font-family: %s, size: %s, position: (%d, %d)\n", fontFamily, fontSize, top, left)
+		fmt.Printf("First heading element font-family: %s, size: %s, position: (%f, %f)\n", fontFamily, fontSize, top, left)
 	}
 }
