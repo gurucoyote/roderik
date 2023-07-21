@@ -33,6 +33,22 @@ func hasCurrentElement() bool {
 	return true
 }
 
+var WalkCmd = &cobra.Command{
+	Use:   "walk [steps]",
+	Short: "Walk to the next element for a number of steps",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		steps, err := strconv.Atoi(args[0])
+		if err != nil {
+			fmt.Println("Error: Invalid number of steps.")
+			return
+		}
+		for i := 0; i < steps; i++ {
+			NextCmd.Run(cmd, []string{})
+		}
+	},
+}
+
 var PrevCmd = &cobra.Command{
 	Use:   "prev [selector]",
 	Short: "Navigate to the previous element",
