@@ -11,6 +11,24 @@ func init() {
 	RootCmd.AddCommand(WalkCmd)
 	RootCmd.AddCommand(ParentCmd)
 	RootCmd.AddCommand(ChildCmd)
+	RootCmd.AddCommand(HeadCmd)
+}
+
+var HeadCmd = &cobra.Command{
+	Use:   "head [level]",
+	Short: "Navigate to the first heading of the specified level, or any level if none is specified",
+	Args:  cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		selector := "h1, h2, h3, h4, h5, h6"
+		if len(args) > 0 {
+			selector = fmt.Sprintf("h%s", args[0])
+		}
+		headings := Page.MustElements(selector)
+		if len(headings) > 0 {
+			CurrentElement = headings[0]
+			ReportElement(CurrentElement)
+		}
+	},
 }
 
 type Element struct {
