@@ -64,11 +64,11 @@ func main() {
 		fmt.Printf("%s: %s\n", level, text)
 	}
 
-	// Output the font-family, size, and position of the first heading element
+	// Output the description of the first heading element
 	if len(headings) > 0 {
 		firstHeading := headings[0]
 		description := firstHeading.MustDescribe()
-		fmt.Println(description)
+		PrettyPrint(description)
 	}
 }
 
