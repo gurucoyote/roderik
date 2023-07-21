@@ -40,8 +40,21 @@ var TextCmd = &cobra.Command{
 	},
 }
 
+var HtmlCmd = &cobra.Command{
+	Use:   "html",
+	Short: "Print the HTML of the current element",
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		html := CurrentElement.MustHTML()
+		fmt.Println(html)
+	},
+}
+
 func init() {
 	RootCmd.AddCommand(BoxCmd)
 	RootCmd.AddCommand(TextCmd)
+	RootCmd.AddCommand(HtmlCmd)
 }
 
