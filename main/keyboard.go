@@ -21,6 +21,14 @@ func main() {
 			commandMode()
 		} else if key == keyboard.KeyEsc {
 			break
+		} else if key == keyboard.KeyArrowUp {
+			fmt.Println("You pressed: Up Arrow")
+		} else if key == keyboard.KeyArrowDown {
+			fmt.Println("You pressed: Down Arrow")
+		} else if key == keyboard.KeyArrowLeft {
+			fmt.Println("You pressed: Left Arrow")
+		} else if key == keyboard.KeyArrowRight {
+			fmt.Println("You pressed: Right Arrow")
 		} else {
 			fmt.Printf("You pressed: rune %q, key %X\r\n", char, key)
 		}
