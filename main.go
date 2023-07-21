@@ -69,3 +69,13 @@ func main() {
 		fmt.Println(description)
 	}
 }
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// PrettyPrint function
+func PrettyPrint(v interface{}) {
+	b, _ := json.MarshalIndent(v, "", "  ")
+	fmt.Println(string(b))
+}
