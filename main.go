@@ -52,12 +52,9 @@ func main() {
 
 	// Print each heading
 	for _, heading := range headings {
-		// Get the heading level
-		level := heading.MustEval("this.nodeName").String()[1]
-
 		// Get the heading text
 		text := heading.MustText()
 
-		fmt.Printf("Heading level %s: %s\n", level, text)
+		fmt.Println(text)
 	}
 }
