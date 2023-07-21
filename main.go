@@ -53,11 +53,12 @@ func main() {
 	// Print each heading
 	for _, heading := range headings {
 		// Get the heading level
-		level := heading.MustEval("() => this.tagName").String()[1]
+		level := heading.MustEval("() => this.tagName").String() // [1]
+		// fmt.Println(level)
 
 		// Get the heading text
 		text := heading.MustText()
 
-		fmt.Printf("Heading level %s: %s\n", level, text)
+		fmt.Printf("%s: %s\n", level, text)
 	}
 }
