@@ -118,6 +118,6 @@ var ShapeCmd = &cobra.Command{
 			fmt.Println("Error getting the shape of the element:", err)
 			return
 		}
-		fmt.Printf("Shape of the element:\nWidth: %v\nHeight: %v\nX: %v\nY: %v\n", boxModel.Width, boxModel.Height, boxModel.X, boxModel.Y)
+		fmt.Println("Shape of the element:", PrettyFormat(boxModel))
 	},
 }
