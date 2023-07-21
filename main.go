@@ -21,15 +21,15 @@ func main() {
         fmt.Println("Launching system Chrome at URL:", url)
         browser := rod.New().ControlURL(url).MustConnect()
     page := browser.MustPage(targetURL)
-    fmt.Println("Connected to browser at URL:", page.MustInfo().Frame.URL)
-    fmt.Println("Opened URL:", page.MustInfo().Frame.URL)
+    fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
+    fmt.Println("Opened URL:", page.MustInfo().URL)
     } else {
         fmt.Println("System Chrome not found. Launching default browser.")
         url := launcher.New().MustLaunch()
         fmt.Println("Launching default browser at URL:", url)
         browser := rod.New().ControlURL(url).MustConnect()
     page := browser.MustPage(targetURL)
-    fmt.Println("Connected to browser at URL:", page.MustInfo().Frame.URL)
-    fmt.Println("Opened URL:", page.MustInfo().Frame.URL)
+    fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
+    fmt.Println("Opened URL:", page.MustInfo().URL)
     }
 }
