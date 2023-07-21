@@ -40,7 +40,7 @@ func main() {
 		Headless(true).MustLaunch()
 	browser := rod.New().ControlURL(u).MustConnect()
 
-	page := browser.MustPage(targetURL)
+	page := browser.MustPage(targetURL).WaitLoad()
 	fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
 	fmt.Println("Opened URL:", page.MustInfo())
 	// Get all headings
