@@ -16,8 +16,8 @@ var CurrentElement *rod.Element
 
 var RootCmd = &cobra.Command{
 	Use:   "roderik",
-	Short: "A brief description of your application",
-	Long:  `A longer description that spans multiple lines and likely contains examples and usage of using your application.`,
+	Short: "A command-line tool for web scraping and automation",
+	Long:  `Roderik is a command-line tool that allows you to navigate, inspect, and interact with elements on a webpage. It uses the Go Rod library for web scraping and automation. You can use it to walk through the DOM, get information about elements, and perform actions like clicking or typing.`,
 	Args:  cobra.MinimumNArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 	},
