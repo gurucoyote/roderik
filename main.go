@@ -66,19 +66,6 @@ func main() {
 	if len(headings) > 0 {
 		firstHeading := headings[0]
 		description := firstHeading.MustDescribe()
-		computedStyles := description.ComputedStyles
-		var fontFamily, fontSize string
-		for _, style := range computedStyles {
-			if style.Name == "font-family" {
-				fontFamily = style.Value
-			} else if style.Name == "font-size" {
-				fontSize = style.Value
-			}
-		}
-		rect := description.LayoutTreeNodes[0].BoundingBox
-		top := rect.Y
-		left := rect.X
-
-		fmt.Printf("First heading element font-family: %s, size: %s, position: (%f, %f)\n", fontFamily, fontSize, top, left)
+		fmt.Println(description)
 	}
 }
