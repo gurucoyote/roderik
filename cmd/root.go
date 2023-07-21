@@ -111,13 +111,13 @@ func prettyPrintJson(s string) string {
 	b, _ := json.MarshalIndent(i, "", "  ")
 	return string(b)
 }
-  func ReportElement(el *rod.Element, maxChars int) {
+  func ReportElement(el *rod.Element) {
       tagName := el.MustEval("() => this.tagName").String()
       childrenCount := len(el.MustElements("*"))
       text := el.MustText()
 
       // Limit the text to maxChars characters
-      limitedText := fmt.Sprintf("%.10s", text)
+      limitedText := fmt.Sprintf("%.100s", text)
 
       fmt.Printf("%s, %d children, %s\n", tagName, childrenCount, limitedText)
   }
