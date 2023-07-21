@@ -11,6 +11,7 @@ import (
 )
 
 var page *rod.Page
+var currentElement *rod.Element
 
 var rootCmd = &cobra.Command{
 	Use:   "roderik",
@@ -30,6 +31,11 @@ var rootCmd = &cobra.Command{
 		fmt.Println("Opened URL:", info.URL, info.Title)
 
 		// Report on the headings
+		headings := page.MustElements("h1, h2, h3, h4, h5, h6")
+		if len(headings) > 0 {
+			currentElement = headings[0]
+		}
+
 		reportOnHeadings(page)
 	},
 }
