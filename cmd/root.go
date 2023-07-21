@@ -40,6 +40,11 @@ var RootCmd = &cobra.Command{
 		reportOnHeadings(Page)
 	},
 }
+
+func init() {
+	RootCmd.AddCommand(NextCmd)
+	RootCmd.AddCommand(PrevCmd)
+}
 func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 	// Ensure user data directory exists
 	userDataDir := filepath.Join(".", "user_data")
