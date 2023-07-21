@@ -43,5 +43,20 @@ func main() {
 	page := browser.MustPage(targetURL)
 	fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
 	fmt.Println("Opened URL:", page.MustInfo().URL)
-	fmt.Println("Page HTML:", page.MustHTML())
+	// Get all headings
+	headings := page.MustElements("h1, h2, h3, h4, h5, h6")
+
+	// Print the count of headings
+	fmt.Println("Count of headings:", len(headings))
+
+	// Print each heading
+	for _, heading := range headings {
+		// Get the heading level
+		level := heading.MustEval("nodeName").String()[1]
+
+		// Get the heading text
+		text := heading.MustText()
+
+		fmt.Printf("Heading level %s: %s\n", level, text)
+	}
 }
