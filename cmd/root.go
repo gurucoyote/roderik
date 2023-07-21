@@ -43,6 +43,7 @@ var RootCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(NextCmd)
 	RootCmd.AddCommand(PrevCmd)
+	RootCmd.AddCommand(WalkCmd)
 }
 func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 	// Ensure user data directory exists
