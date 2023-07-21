@@ -19,9 +19,7 @@ var NextCmd = &cobra.Command{
 				return
 			}
 			CurrentElement = nextElement
-			fmt.Println("Navigated to the next element.")
-			fmt.Println("Tag name of the next element:", nextElement.MustEval("() => this.tagName").String())
-			fmt.Println("Text of the next element:", nextElement.MustText())
+			ReportElement(nextElement)
 	},
 }
 
@@ -49,8 +47,7 @@ var WalkCmd = &cobra.Command{
 			}
 		}
 		if CurrentElement != nil {
-			fmt.Println("Tag name of the first element after walk:", CurrentElement.MustEval("() => this.tagName").String())
-			fmt.Println("Text of the first element after walk:", CurrentElement.MustText())
+			ReportElement(CurrentElement)
 		}
 	},
 }
@@ -73,9 +70,7 @@ var PrevCmd = &cobra.Command{
 			return
 		}
 		CurrentElement = prevElement
-		fmt.Println("Navigated to the previous element.")
-		fmt.Println("Tag name of the previous element:", prevElement.MustEval("() => this.tagName").String())
-		fmt.Println("Text of the previous element:", prevElement.MustText())
+			ReportElement(prevElement)
 	},
 }
 
