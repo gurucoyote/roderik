@@ -81,13 +81,11 @@ func PrepareBrowser() (*rod.Browser, error) {
 
 	return browser, nil
 }
-
 func LoadURL(browser *rod.Browser, targetURL string) (*rod.Page, error) {
 	page := browser.MustPage(targetURL)
 	page.WaitLoad()
 	return page, nil
 }
-
 func reportOnHeadings(Page *rod.Page) {
 	// Get all headings
 	headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
