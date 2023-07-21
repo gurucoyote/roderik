@@ -105,3 +105,19 @@ var ParentCmd = &cobra.Command{
 		ReportElement(CurrentElement)
 	},
 }
+
+var ShapeCmd = &cobra.Command{
+	Use:   "shape",
+	Short: "Get the shape of the current element",
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		boxModel, err := CurrentElement.Shape()
+		if err != nil {
+			fmt.Println("Error getting the shape of the element:", err)
+			return
+		}
+		fmt.Println("Shape of the element:", boxModel)
+	},
+}
