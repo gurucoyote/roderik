@@ -5,6 +5,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	RootCmd.AddCommand(NextCmd)
+	RootCmd.AddCommand(PrevCmd)
+	RootCmd.AddCommand(WalkCmd)
+	RootCmd.AddCommand(ParentCmd)
+	RootCmd.AddCommand(ChildCmd)
+}
+
 type Element struct {
 	// Define the fields of the Element struct here
 }

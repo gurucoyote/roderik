@@ -15,3 +15,7 @@ var BoxCmd = &cobra.Command{
 	},
 }
 
+func init() {
+	RootCmd.AddCommand(BoxCmd)
+}
+
