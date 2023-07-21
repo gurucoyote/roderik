@@ -43,4 +43,5 @@ func main() {
 	page := browser.MustPage(targetURL)
 	fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
 	fmt.Println("Opened URL:", page.MustInfo().URL)
+	fmt.Println("Page HTML:", page.MustHTML())
 }
