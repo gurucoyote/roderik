@@ -3,7 +3,12 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"math"
 )
+
+type Element struct {
+	// Define the fields of the Element struct here
+}
 
 var NextCmd = &cobra.Command{
 	Use:   "next [selector]",
