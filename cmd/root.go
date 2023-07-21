@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"encoding/json"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -23,20 +24,20 @@ var RootCmd = &cobra.Command{
 		fmt.Println("Target URL:", targetURL)
 
 		// Prepare the browser and load the target URL
-		page = prepareBrowserAndLoadURL(targetURL)
-		fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
+		Page = prepareBrowserAndLoadURL(targetURL)
+		fmt.Println("Connected to browser at URL:", Page.MustInfo().URL)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		info := page.MustInfo()
+		info := Page.MustInfo()
 		fmt.Println("Opened URL:", info.URL, info.Title)
 
 		// Report on the headings
-		headings := page.MustElements("h1, h2, h3, h4, h5, h6")
+		headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
 		if len(headings) > 0 {
-			currentElement = headings[0]
+			CurrentElement = headings[0]
 		}
 
-		reportOnHeadings(page)
+		reportOnHeadings(Page)
 	},
 }
 func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
@@ -61,9 +62,9 @@ func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 	return browser.MustPage(targetURL).MustWaitLoad()
 }
 
-func reportOnHeadings(page *rod.Page) {
+func reportOnHeadings(Page *rod.Page) {
 	// Get all headings
-	headings := page.MustElements("h1, h2, h3, h4, h5, h6")
+	headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
 
 	// Print the count of headings
 	fmt.Println("Count of headings:", len(headings))
@@ -91,7 +92,16 @@ func reportOnHeadings(page *rod.Page) {
 		// fmt.Println("Description: ", PrettyFormat(description))
 	}
 }
+// PrettyFormat function
 func PrettyFormat(v interface{}) string {
 	b, _ := json.MarshalIndent(v, "", "  ")
 return string(b)
+}
+
+// prettyPrintJson function
+func prettyPrintJson(s string) string {
+	var i interface{}
+	json.Unmarshal([]byte(s), &i)
+	b, _ := json.MarshalIndent(i, "", "  ")
+	return string(b)
 }
