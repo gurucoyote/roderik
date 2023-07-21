@@ -39,7 +39,8 @@ var WalkCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		steps, _ := cmd.Flags().GetInt("steps")
 		if steps < 0 {
-			for i := 0; i < -steps; i++ {
+			steps = -steps
+			for i := 0; i < steps; i++ {
 				PrevCmd.Run(cmd, []string{})
 			}
 		} else {
