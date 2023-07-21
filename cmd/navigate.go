@@ -35,19 +35,18 @@ func hasCurrentElement() bool {
 }
 
 var WalkCmd = &cobra.Command{
-	Use:   "walk [steps]",
+	Use:   "walk",
 	Short: "Walk to the next element for a number of steps",
-	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		steps, err := strconv.Atoi(args[0])
-		if err != nil {
-			fmt.Println("Error: Invalid number of steps.")
-			return
-		}
+		steps, _ := cmd.Flags().GetInt("steps")
 		for i := 0; i < steps; i++ {
 			NextCmd.Run(cmd, []string{})
 		}
 	},
+}
+
+func init() {
+	WalkCmd.Flags().Int("steps", 4, "Number of steps to walk")
 }
 
 var PrevCmd = &cobra.Command{
