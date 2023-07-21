@@ -21,7 +21,7 @@ func main() {
 		case char == ':':
 			commandMode()
 		case key == keyboard.KeyEsc:
-			break
+			return 
 		case key == keyboard.KeyArrowUp:
 			fmt.Println("You pressed: Up Arrow")
 		case key == keyboard.KeyArrowDown:
