@@ -40,12 +40,7 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(NextCmd)
-	RootCmd.AddCommand(PrevCmd)
-	RootCmd.AddCommand(WalkCmd)
-	RootCmd.AddCommand(ParentCmd)
-	RootCmd.AddCommand(ChildCmd)
-	RootCmd.AddCommand(BoxCmd)
+	// Sub commands removed
 }
 func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 	// Ensure user data directory exists
