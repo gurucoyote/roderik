@@ -69,8 +69,8 @@ func main() {
 		firstHeading := headings[0]
 		fontFamily := firstHeading.MustEval(`() => getComputedStyle(this).fontFamily`).String()
 		fmt.Println("Font Family of the first heading:", fontFamily)
-		conputedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`).String()
-		fmt.Println("computed styles", prettyPrintJson(conputedStyles))
+computedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`)
+fmt.Println("computed styles", PrettyFormat(computedStyles))
 		// description := firstHeading.MustDescribe()
 		// fmt.Println("Description: ", PrettyFormat(description))
 	}
