@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var page *rod.Page
+
 var rootCmd = &cobra.Command{
 	Use:   "roderik",
 	Short: "A brief description of your application",
@@ -20,7 +22,7 @@ var rootCmd = &cobra.Command{
 		fmt.Println("Target URL:", targetURL)
 
 		// Prepare the browser and load the target URL
-		page := prepareBrowserAndLoadURL(targetURL)
+		page = prepareBrowserAndLoadURL(targetURL)
 		fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
 		info := page.MustInfo()
 		fmt.Println("Opened URL:", info.URL, info.Title)
