@@ -41,6 +41,10 @@ var WalkCmd = &cobra.Command{
 		for i := 0; i < steps; i++ {
 			NextCmd.Run(cmd, []string{})
 		}
+		if CurrentElement != nil {
+			fmt.Println("Tag name of the first element after walk:", CurrentElement.MustEval("() => this.tagName").String())
+			fmt.Println("Text of the first element after walk:", CurrentElement.MustText())
+		}
 	},
 }
 
