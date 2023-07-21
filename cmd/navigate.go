@@ -110,9 +110,9 @@ var ParentCmd = &cobra.Command{
 	},
 }
 
-var ShapeCmd = &cobra.Command{
-	Use:   "shape",
-	Short: "Get the shape of the current element",
+var BoxCmd = &cobra.Command{
+	Use:   "box",
+	Short: "Get the box of the current element",
 	Run: func(cmd *cobra.Command, args []string) {
 		if !hasCurrentElement() {
 			return
