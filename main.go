@@ -42,7 +42,7 @@ func main() {
 
 	page := browser.MustPage(targetURL)
 	fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
-	fmt.Println("Opened URL:", page.MustInfo().URL)
+	fmt.Println("Opened URL:", page.MustInfo())
 	// Get all headings
 	headings := page.MustElements("h1, h2, h3, h4, h5, h6")
 
