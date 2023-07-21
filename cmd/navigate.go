@@ -38,8 +38,14 @@ var WalkCmd = &cobra.Command{
 	Short: "Walk to the next element for a number of steps",
 	Run: func(cmd *cobra.Command, args []string) {
 		steps, _ := cmd.Flags().GetInt("steps")
-		for i := 0; i < steps; i++ {
-			NextCmd.Run(cmd, []string{})
+		if steps < 0 {
+			for i := 0; i < -steps; i++ {
+				PrevCmd.Run(cmd, []string{})
+			}
+		} else {
+			for i := 0; i < steps; i++ {
+				NextCmd.Run(cmd, []string{})
+			}
 		}
 		if CurrentElement != nil {
 			fmt.Println("Tag name of the first element after walk:", CurrentElement.MustEval("() => this.tagName").String())
