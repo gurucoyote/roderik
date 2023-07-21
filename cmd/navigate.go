@@ -10,6 +10,10 @@ var NextCmd = &cobra.Command{
 	Short: "Navigate to the next element",
 	Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			if CurrentElement == nil {
+				fmt.Println("Error: CurrentElement is not defined. Please load a page or navigate to an element first.")
+				return
+			}
 			nextElement, err := CurrentElement.Next()
 			if err != nil {
 				fmt.Println("Error navigating to the next element:", err)
