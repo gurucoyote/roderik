@@ -3,15 +3,23 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-)
-
 var NextCmd = &cobra.Command{
 	Use:   "next [selector]",
 	Short: "Navigate to the next element",
 	Args:  cobra.MaximumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			if CurrentElement == nil {
-				fmt.Println("Error: CurrentElement is not defined. Please load a page or navigate to an element first.")
+	Run: func(cmd *cobra.Command, args []string) {
+		// Implementation of the next command
+	},
+}
+
+func hasCurrentElement() bool {
+	if CurrentElement == nil {
+		fmt.Println("Error: CurrentElement is not defined. Please load a page or navigate to an element first.")
+		return false
+	}
+	return true
+}
+			if !hasCurrentElement() {
 				return
 			}
 			nextElement, err := CurrentElement.Next()
