@@ -17,16 +17,41 @@ var rootCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		targetURL := args[0]
-	fmt.Println("Target URL:", targetURL)
+		fmt.Println("Target URL:", targetURL)
 
+		// Prepare the browser and load the target URL
+		page := prepareBrowserAndLoadURL(targetURL)
+		fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
+		info := page.MustInfo()
+		fmt.Println("Opened URL:", info.URL, info.Title)
+
+		// Report on the headings
+		reportOnHeadings(page)
+	},
+
+// PrettyFormat function
+func PrettyFormat(v interface{}) string {
+	b, _ := json.MarshalIndent(v, "", "  ")
+return string(b)
+}
+
+// prettyPrintJson function
+func prettyPrintJson(s string) string {
+	var i interface{}
+	json.Unmarshal([]byte(s), &i)
+	b, _ := json.MarshalIndent(i, "", "  ")
+	return string(b)
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 	// Ensure user data directory exists
 	userDataDir := filepath.Join(".", "user_data")
-	if _, err := os.Stat(userDataDir); os.IsNotExist(err) {
-		os.Mkdir(userDataDir, 0755)
-	}
-
-	// Ensure user data directory exists
-	userDataDir = filepath.Join(".", "user_data")
 	if _, err := os.Stat(userDataDir); os.IsNotExist(err) {
 		os.Mkdir(userDataDir, 0755)
 	}
@@ -43,10 +68,10 @@ var rootCmd = &cobra.Command{
 		Headless(true).MustLaunch()
 	browser := rod.New().ControlURL(u).MustConnect()
 
-	page := browser.MustPage(targetURL).MustWaitLoad()
-	fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
-	info := page.MustInfo()
-	fmt.Println("Opened URL:", info.URL, info.Title)
+	return browser.MustPage(targetURL).MustWaitLoad()
+}
+
+func reportOnHeadings(page *rod.Page) {
 	// Get all headings
 	headings := page.MustElements("h1, h2, h3, h4, h5, h6")
 
@@ -70,31 +95,9 @@ var rootCmd = &cobra.Command{
 		firstHeading := headings[0]
 		fontFamily := firstHeading.MustEval(`() => getComputedStyle(this).fontFamily`).String()
 		fmt.Println("Font Family of the first heading:", fontFamily)
-computedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`)
-fmt.Println("computed styles", PrettyFormat(computedStyles))
+		computedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`)
+		fmt.Println("computed styles", PrettyFormat(computedStyles))
 		// description := firstHeading.MustDescribe()
 		// fmt.Println("Description: ", PrettyFormat(description))
-	}
-},
-}
-
-// PrettyFormat function
-func PrettyFormat(v interface{}) string {
-	b, _ := json.MarshalIndent(v, "", "  ")
-return string(b)
-}
-
-// prettyPrintJson function
-func prettyPrintJson(s string) string {
-	var i interface{}
-	json.Unmarshal([]byte(s), &i)
-	b, _ := json.MarshalIndent(i, "", "  ")
-	return string(b)
-}
-
-func main() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
 	}
 }
