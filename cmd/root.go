@@ -82,7 +82,11 @@ func PrepareBrowser() (*rod.Browser, error) {
 	return browser, nil
 }
 func LoadURL(browser *rod.Browser, targetURL string) (*rod.Page, error) {
-	page := browser.MustPage(targetURL)
+	page := browser.MustPage("about:blank")
+	err := page.Navigate(targetURL)
+	if err != nil {
+		return nil, err
+	}
 	page.WaitLoad()
 	return page, nil
 }
