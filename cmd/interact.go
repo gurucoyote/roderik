@@ -8,7 +8,14 @@ var ClickCmd = &cobra.Command{
 	Use:   "click",
 	Short: "Click on the current element",
 	Run: func(cmd *cobra.Command, args []string) {
-		// Add your code here
+		if !hasCurrentElement() {
+			return
+		}
+		err := CurrentElement.Click()
+		if err != nil {
+			fmt.Println("Error clicking on the current element:", err)
+			return
+		}
 	},
 }
 
