@@ -25,17 +25,16 @@ var RootCmd = &cobra.Command{
 
 		// Prepare the browser and load the target URL
 		Page = prepareBrowserAndLoadURL(targetURL)
-		fmt.Println("Connected to browser at URL:", Page.MustInfo().URL)
-	},
-	Run: func(cmd *cobra.Command, args []string) {
 		info := Page.MustInfo()
 		fmt.Println("Opened URL:", info.URL, info.Title)
-
-		// Report on the headings
 		headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
 		if len(headings) > 0 {
 			CurrentElement = headings[0]
 		}
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+
+		// Report on the headings
 
 		reportOnHeadings(Page)
 	},
