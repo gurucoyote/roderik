@@ -8,16 +8,11 @@ import (
 )
 
 func main() {
-	err := keyboard.Open()
-	if err != nil {
-		panic(err)
-	}
-	defer keyboard.Close()
 
 	fmt.Println("Press any key to see its ASCII code press Q to quit")
 
 	for {
-		char, key, err := keyboard.GetKey()
+		char, key, err := keyboard.GetSingleKey()
 		if err != nil {
 			panic(err)
 		}
