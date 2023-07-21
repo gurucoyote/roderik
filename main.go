@@ -40,9 +40,10 @@ func main() {
 		Headless(true).MustLaunch()
 	browser := rod.New().ControlURL(u).MustConnect()
 
-	page := browser.MustPage(targetURL).WaitLoad()
+	page := browser.MustPage(targetURL).MustWaitLoad()
 	fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
-	fmt.Println("Opened URL:", page.MustInfo())
+	info := page.MustInfo()
+	fmt.Println("Opened URL:", info.URL, info.Title)
 	// Get all headings
 	headings := page.MustElements("h1, h2, h3, h4, h5, h6")
 
@@ -51,8 +52,8 @@ func main() {
 
 	// Print each heading
 	for _, heading := range headings {
-		// Get the heading level
-		level := heading.MustEval("nodeName").String()[1]
+    // Get the heading level
+    level := heading.MustEval("this.nodeName").String()[1]
 
 		// Get the heading text
 		text := heading.MustText()
