@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"encoding/json"
+	"math"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -113,3 +114,12 @@ func prettyPrintJson(s string) string {
       fmt.Printf("%s, %d children, %s\n", tagName, childrenCount, limitedText)
   }
 
+func Box(el *rod.Element) error {
+	shape, err := el.Shape()
+	if err != nil {
+		return err
+	}
+	box := shape.Box()
+	fmt.Println("box: ", PrettyFormat(box))
+	return nil
+}

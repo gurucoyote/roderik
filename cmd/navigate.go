@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"math"
 )
 
 type Element struct {
@@ -118,31 +117,6 @@ var ShapeCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
-		boxModel, err := CurrentElement.Shape()
-		if err != nil {
-			fmt.Println("Error getting the shape of the element:", err)
-			return
-		}
-		fmt.Println("Shape of the element:", PrettyFormat(boxModel))
+		Box(CurrentElement)
 	},
-}
-func (el *Element) BoundingBox() (float64, float64, float64, float64, error) {
-	shape, err := el.Shape()
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-
-	// Assuming the first quad is the bounding box
-	quad := shape.Quads[0]
-
-	// Calculate the bounding box
-	left := math.Min(math.Min(math.Min(quad[0], quad[2]), quad[4]), quad[6])
-	top := math.Min(math.Min(math.Min(quad[1], quad[3]), quad[5]), quad[7])
-	right := math.Max(math.Max(math.Max(quad[0], quad[2]), quad[4]), quad[6])
-	bottom := math.Max(math.Max(math.Max(quad[1], quad[3]), quad[5]), quad[7])
-
-	width := right - left
-	height := bottom - top
-
-	return top, left, width, height, nil
 }
