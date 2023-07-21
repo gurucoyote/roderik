@@ -13,6 +13,7 @@ var NextCmd = &cobra.Command{
 			if !hasCurrentElement() {
 				return
 			}
+		ReportElement(CurrentElement)
 			nextElement, err := CurrentElement.Next()
 			if err != nil {
 				fmt.Println("Error navigating to the next element:", err)
@@ -35,6 +36,11 @@ var WalkCmd = &cobra.Command{
 	Use:   "walk",
 	Short: "Walk to the next element for a number of steps",
 	Run: func(cmd *cobra.Command, args []string) {
+		if CurrentElement != nil {
+			ReportElement(CurrentElement)
+		} else {
+			return
+		}
 		steps, _ := cmd.Flags().GetInt("steps")
 		if steps < 0 {
 			steps = -steps
@@ -45,9 +51,6 @@ var WalkCmd = &cobra.Command{
 			for i := 0; i < steps; i++ {
 				NextCmd.Run(cmd, []string{})
 			}
-		}
-		if CurrentElement != nil {
-			ReportElement(CurrentElement)
 		}
 	},
 }
@@ -64,6 +67,7 @@ var PrevCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
+		ReportElement(CurrentElement)
 		prevElement, err := CurrentElement.Previous()
 		if err != nil {
 			fmt.Println("Error navigating to the previous element:", err)

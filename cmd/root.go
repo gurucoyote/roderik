@@ -35,7 +35,6 @@ var RootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		// Report on the headings
-
 		reportOnHeadings(Page)
 	},
 }
@@ -71,31 +70,21 @@ func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 func reportOnHeadings(Page *rod.Page) {
 	// Get all headings
 	headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
-
 	// Print the count of headings
 	fmt.Println("Count of headings:", len(headings))
-
-	// Print each heading
-	for _, heading := range headings {
-		// Get the heading level
-		level := heading.MustEval("() => this.tagName").String() // [1]
-		// fmt.Println(level)
-
-		// Get the heading text
-		text := heading.MustText()
-
-		fmt.Printf("%s: %s\n", level, text)
-	}
 
 	// Output the description and font-family of the first heading element
 	if len(headings) > 0 {
 		firstHeading := headings[0]
 		fontFamily := firstHeading.MustEval(`() => getComputedStyle(this).fontFamily`).String()
 		fmt.Println("Font Family of the first heading:", fontFamily)
+		CurrentElement = firstHeading 
+		/*
 		computedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`)
 		fmt.Println("computed styles", PrettyFormat(computedStyles))
 		// description := firstHeading.MustDescribe()
 		// fmt.Println("Description: ", PrettyFormat(description))
+		*/
 	}
 }
 // PrettyFormat function
