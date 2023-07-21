@@ -20,6 +20,9 @@ var RootCmd = &cobra.Command{
 	Long:  `A longer description that spans multiple lines and likely contains examples and usage of using your application.`,
 	Args:  cobra.MinimumNArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+
 		targetURL := args[0]
 		fmt.Println("Target URL:", targetURL)
 
@@ -31,9 +34,6 @@ var RootCmd = &cobra.Command{
 		if len(headings) > 0 {
 			CurrentElement = headings[0]
 		}
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-
 		// Report on the headings
 		reportOnHeadings(Page)
 	},
