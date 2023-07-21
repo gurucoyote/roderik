@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/eiannone/keyboard"
+	"os"
 )
 
 func main() {
@@ -14,31 +16,25 @@ func main() {
 
 	fmt.Println("Press any key to see its ASCII code press Q to quit")
 
-	commandMode := false
-	command := ""
-
 	for {
 		char, key, err := keyboard.GetKey()
 		if err != nil {
 			panic(err)
 		}
 
-		if commandMode {
-			if key == keyboard.KeyEnter {
-				fmt.Printf("Command entered: %s\r\n", command)
-				command = ""
-				commandMode = false
-			} else {
-				command += string(char)
-			}
+		if char == ':' {
+			commandMode()
+		} else if key == keyboard.KeyEsc {
+			break
 		} else {
 			fmt.Printf("You pressed: rune %q, key %X\r\n", char, key)
-
-			if char == ':' {
-				commandMode = true
-			} else if key == keyboard.KeyEsc {
-				break
-			}
 		}
 	}
+}
+
+func commandMode() {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter command: ")
+	command, _ := reader.ReadString('\n')
+	fmt.Printf("Command entered: %s\r\n", command)
 }
