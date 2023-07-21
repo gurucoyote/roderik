@@ -13,6 +13,27 @@ func init() {
 	RootCmd.AddCommand(ChildCmd)
 	RootCmd.AddCommand(HeadCmd)
 	RootCmd.AddCommand(BodyCmd)
+	RootCmd.AddCommand(ElemCmd)
+}
+
+var ElemCmd = &cobra.Command{
+	Use:   "elem [selector]",
+	Short: "Navigate to the first element that matches the CSS selector",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		selector := args[0]
+		element, err := CurrentElement.Element(selector)
+		if err != nil {
+			fmt.Println("Error navigating to the element:", err)
+			return
+		}
+		CurrentElement = element
+		fmt.Println("Navigated to the element.")
+		ReportElement(CurrentElement)
+	},
 }
 
 var BodyCmd = &cobra.Command{
