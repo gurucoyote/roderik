@@ -26,8 +26,20 @@ var RootCmd = &cobra.Command{
 		targetURL := args[0]
 		fmt.Println("Target URL:", targetURL)
 
-		// Prepare the browser and load the target URL
-		Page = prepareBrowserAndLoadURL(targetURL)
+		// Prepare the browser
+		browser, err := PrepareBrowser()
+		if err != nil {
+			fmt.Println("Error preparing browser:", err)
+			return
+		}
+
+		// Load the target URL
+		Page, err = LoadURL(browser, targetURL)
+		if err != nil {
+			fmt.Println("Error loading URL:", err)
+			return
+		}
+
 		info := Page.MustInfo()
 		fmt.Println("Opened URL:", info.URL, info.Title)
 		headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
@@ -42,15 +54,21 @@ var RootCmd = &cobra.Command{
 func init() {
 	// Sub commands removed
 }
-func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
+func PrepareBrowser() (*rod.Browser, error) {
 	// Ensure user data directory exists
 	userDataDir := filepath.Join(".", "user_data")
 	if _, err := os.Stat(userDataDir); os.IsNotExist(err) {
-		os.Mkdir(userDataDir, 0755)
+		err = os.Mkdir(userDataDir, 0755)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Get the browser executable path
-	path, _ := launcher.LookPath()
+	path, err := launcher.LookPath()
+	if err != nil {
+		return nil, err
+	}
 	u := launcher.New().Bin(path).
 		Set("disable-web-security").
 		Set("disable-setuid-sandbox").
@@ -61,7 +79,16 @@ func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 		Headless(true).MustLaunch()
 	browser := rod.New().ControlURL(u).MustConnect()
 
-	return browser.MustPage(targetURL).MustWaitLoad()
+	return browser, nil
+}
+
+func LoadURL(browser *rod.Browser, targetURL string) (*rod.Page, error) {
+	page := browser.MustPage(targetURL)
+	err := page.WaitLoad()
+	if err != nil {
+		return nil, err
+	}
+	return page, nil
 }
 
 func reportOnHeadings(Page *rod.Page) {
