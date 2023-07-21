@@ -36,6 +36,7 @@ func main() {
 		Set("no-sandbox").
 		Set("no-first-run", "true").
 		Set("disable-gpu").
+		Set("user-data-dir", userDataDir).
 		Headless(true).MustLaunch()
 	browser := rod.New().ControlURL(u).MustConnect()
 
