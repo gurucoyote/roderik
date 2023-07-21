@@ -62,10 +62,16 @@ func main() {
 		fmt.Printf("%s: %s\n", level, text)
 	}
 
-	// Output the description of the first heading element
+	// Output the font-family, size, and position of the first heading element
 	if len(headings) > 0 {
 		firstHeading := headings[0]
-		description := firstHeading.MustDescribe()
-		fmt.Println("First heading element description:", description)
+		style := firstHeading.MustEval(`getComputedStyle(this)`).Object()
+		fontFamily := style.Get("fontFamily").String()
+		fontSize := style.Get("fontSize").String()
+		rect := firstHeading.MustShape().First().Get("boundingBox").Object()
+		top := rect.Get("y").Int()
+		left := rect.Get("x").Int()
+
+		fmt.Printf("First heading element font-family: %s, size: %s, position: (%d, %d)\n", fontFamily, fontSize, top, left)
 	}
 }
