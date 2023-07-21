@@ -46,6 +46,8 @@ func init() {
 	RootCmd.AddCommand(WalkCmd)
 	RootCmd.AddCommand(ParentCmd)
 }
+	RootCmd.AddCommand(ParentCmd)
+}
 func prepareBrowserAndLoadURL(targetURL string) *rod.Page {
 	// Ensure user data directory exists
 	userDataDir := filepath.Join(".", "user_data")

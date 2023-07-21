@@ -59,6 +59,26 @@ func init() {
 	WalkCmd.Flags().Int("steps", 4, "Number of steps to walk")
 }
 
+var PrevCmd = &cobra.Command{
+	Use:   "prev [selector]",
+	Short: "Navigate to the previous element",
+	Args:  cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		prevElement, err := CurrentElement.Previous()
+		if err != nil {
+			fmt.Println("Error navigating to the previous element:", err)
+			return
+		}
+		CurrentElement = prevElement
+		fmt.Println("Navigated to the previous element.")
+		fmt.Println("Tag name of the previous element:", prevElement.MustEval("() => this.tagName").String())
+		fmt.Println("Text of the previous element:", prevElement.MustText())
+	},
+}
+
 var ParentCmd = &cobra.Command{
 	Use:   "parent",
 	Short: "Navigate to the parent of the current element",
