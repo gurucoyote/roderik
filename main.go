@@ -11,7 +11,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "app",
+	Use:   "roderik",
 	Short: "A brief description of your application",
 	Long:  `A longer description that spans multiple lines and likely contains examples and usage of using your application.`,
 	Args:  cobra.MinimumNArgs(1),
@@ -28,6 +28,7 @@ var rootCmd = &cobra.Command{
 		// Report on the headings
 		reportOnHeadings(page)
 	},
+}
 
 // PrettyFormat function
 func PrettyFormat(v interface{}) string {
