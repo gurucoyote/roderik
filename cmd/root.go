@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"encoding/json"
-	"math"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
