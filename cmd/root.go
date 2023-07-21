@@ -9,6 +9,7 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/spf13/cobra"
+	"roderik/cmd"
 )
 
 var Page *rod.Page
