@@ -61,4 +61,11 @@ func main() {
 
 		fmt.Printf("%s: %s\n", level, text)
 	}
+
+	// Output the data structure of the first heading element as a pretty-printed JSON string
+	if len(headings) > 0 {
+		firstHeading := headings[0]
+		json := firstHeading.MustJSON()
+		fmt.Println("First heading element data structure:", json)
+	}
 }
