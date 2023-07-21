@@ -70,7 +70,7 @@ func main() {
 		fontFamily := firstHeading.MustEval(`() => getComputedStyle(this).fontFamily`).String()
 		fmt.Println("Font Family of the first heading:", fontFamily)
 		conputedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`).String()
-		fmt.Println("computed styles", PrettyFormat(conputedStyles))
+		fmt.Println("computed styles", prettyPrintJson(conputedStyles))
 		// description := firstHeading.MustDescribe()
 		// fmt.Println("Description: ", PrettyFormat(description))
 	}
@@ -80,4 +80,12 @@ func main() {
 func PrettyFormat(v interface{}) string {
 	b, _ := json.MarshalIndent(v, "", "  ")
 return string(b)
+}
+
+// prettyPrintJson function
+func prettyPrintJson(s string) string {
+	var i interface{}
+	json.Unmarshal([]byte(s), &i)
+	b, _ := json.MarshalIndent(i, "", "  ")
+	return string(b)
 }
