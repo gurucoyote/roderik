@@ -17,13 +17,15 @@ var rootCmd = &cobra.Command{
 	Short: "A brief description of your application",
 	Long:  `A longer description that spans multiple lines and likely contains examples and usage of using your application.`,
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		targetURL := args[0]
 		fmt.Println("Target URL:", targetURL)
 
 		// Prepare the browser and load the target URL
 		page = prepareBrowserAndLoadURL(targetURL)
 		fmt.Println("Connected to browser at URL:", page.MustInfo().URL)
+	},
+	Run: func(cmd *cobra.Command, args []string) {
 		info := page.MustInfo()
 		fmt.Println("Opened URL:", info.URL, info.Title)
 
