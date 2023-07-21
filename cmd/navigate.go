@@ -74,6 +74,24 @@ var PrevCmd = &cobra.Command{
 	},
 }
 
+var ChildCmd = &cobra.Command{
+	Use:   "child",
+	Short: "Navigate to the first child of the current element",
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		childElement, err := CurrentElement.FirstChild()
+		if err != nil {
+			fmt.Println("Error navigating to the child element:", err)
+			return
+		}
+		CurrentElement = childElement
+		fmt.Println("Navigated to the child element.")
+		ReportElement(CurrentElement)
+	},
+}
+
 var ParentCmd = &cobra.Command{
 	Use:   "parent",
 	Short: "Navigate to the parent of the current element",
