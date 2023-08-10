@@ -40,7 +40,19 @@ var TypeCmd = &cobra.Command{
 	Use:   "type",
 	Short: "Type text into the current element",
 	Run: func(cmd *cobra.Command, args []string) {
-		// Add your code here
+		if !hasCurrentElement() {
+			return
+		}
+		if len(args) < 1 {
+			fmt.Println("Error: No text provided for typing")
+			return
+		}
+		text := args[0]
+		err := CurrentElement.Input(text)
+		if err != nil {
+			fmt.Println("Error typing into the current element:", err)
+			return
+		}
 	},
 }
 
