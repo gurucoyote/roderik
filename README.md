@@ -27,3 +27,11 @@ Flags:
 
 Use "roderik [command] --help" for more information about a command.
 
+##Status
+As of now, this is very muc a WiP.
+It kida already works, with most basic interaction and inspection commands present.
+It very much needs refining and better error handling etc.
+
+## Similar
+
+This is a successor to my earlier attempt, called willbrowser, which was written in nodejs and the playwright framework. https://github.com/gurucoyote/willbrowser
