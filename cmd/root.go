@@ -73,6 +73,7 @@ var RootCmd = &cobra.Command{
 
 func init() {
 	// Sub commands removed
+	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
 }
 func PrepareBrowser() (*rod.Browser, error) {
 	// Ensure user data directory exists
