@@ -867,3 +867,46 @@ func TestPageActionAfterClose(t *testing.T) {
 		g.Eq(err, context.Canceled)
 	}
 }
+import (
+	"log"
+	"sync"
+)
+
+type EventLog struct {
+	mu    sync.Mutex
+	logs  []string
+}
+
+func (l *EventLog) Add(log string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logs = append(l.logs, log)
+}
+
+func (l *EventLog) Display() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, log := range l.logs {
+		fmt.Println(log)
+	}
+}
+
+func TestMonitorNetworkEvents(t *testing.T) {
+	g := setup(t)
+	page := g.newPage()
+
+	eventLog := &EventLog{}
+
+	page.EnableDomain(proto.NetworkEnable{})
+	go page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
+		eventLog.Add(fmt.Sprintf("Request sent: %s", e.Request.URL))
+	})()
+	go page.EachEvent(func(e *proto.NetworkResponseReceived) {
+		eventLog.Add(fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status))
+	})()
+
+	page.MustNavigate("https://example.com")
+
+	// Display the logs
+	eventLog.Display()
+}
