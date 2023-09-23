@@ -44,8 +44,13 @@ var HtmlCmd = &cobra.Command{
 	Use:   "html",
 	Short: "Print the HTML of the current element",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(args)
-		return
+		if len(args) > 0 {
+			url := args[0]
+			if isValidURL(url) {
+				LoadUrl(url)
+				return
+			}
+		}
 		if !hasCurrentElement() {
 			return
 		}
