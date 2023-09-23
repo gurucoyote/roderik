@@ -47,7 +47,13 @@ var HtmlCmd = &cobra.Command{
 		if len(args) > 0 {
 			url := args[0]
 			if isValidURL(url) {
-				LoadUrl(url)
+				Page, err := LoadURL(url)
+				if err != nil {
+					fmt.Println("Error loading URL:", err)
+					return
+				}
+				html := Page.MustHTML()
+				fmt.Println(html)
 				return
 			}
 		}
