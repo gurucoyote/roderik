@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -107,9 +108,6 @@ func PrepareBrowser() (*rod.Browser, error) {
 
 	return browser, nil
 }
-import (
-	"net/url"
-)
 
 func isValidURL(str string) bool {
 	u, err := url.Parse(str)
