@@ -1,10 +1,10 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"encoding/json"
 	"sync"
 
 	"github.com/go-rod/rod"
@@ -12,11 +12,14 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
 )
+
 var ShowNetActivity bool
+
 type EventLog struct {
-	mu    sync.Mutex
-	logs  []string
+	mu   sync.Mutex
+	logs []string
 }
+
 func (l *EventLog) Add(log string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -31,6 +34,7 @@ func (l *EventLog) Display() {
 	}
 }
 
+var Browser rod.Browser
 var Page *rod.Page
 var CurrentElement *rod.Element
 
@@ -40,21 +44,22 @@ var RootCmd = &cobra.Command{
 	Long:  `Roderik is a command-line tool that allows you to navigate, inspect, and interact with elements on a webpage. It uses the Go Rod library for web scraping and automation. You can use it to walk through the DOM, get information about elements, and perform actions like clicking or typing.`,
 	Args:  cobra.MinimumNArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Prepare the browser
+		Browser, err := PrepareBrowser()
+		if err != nil {
+			fmt.Println("Error preparing browser:", err)
+			return
+		}
+		Page = Browser.MustPage("about:blank")
+		Page.MustInfo()
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 
 		targetURL := args[0]
 		fmt.Println("Target URL:", targetURL)
 
-		// Prepare the browser
-		browser, err := PrepareBrowser()
-		if err != nil {
-			fmt.Println("Error preparing browser:", err)
-			return
-		}
-
 		// Load the target URL
-		Page, err = LoadURL(browser, targetURL)
+		Page, err := LoadURL(targetURL)
 		if err != nil {
 			fmt.Println("Error loading URL:", err)
 			return
@@ -102,34 +107,32 @@ func PrepareBrowser() (*rod.Browser, error) {
 
 	return browser, nil
 }
-func LoadURL(browser *rod.Browser, targetURL string) (*rod.Page, error) {
-	page := browser.MustPage("about:blank")
-	 // setup network aktivity logging
+func LoadURL(targetURL string) (*rod.Page, error) {
+	// setup network aktivity logging
 	eventLog := &EventLog{}
 
-	page.EnableDomain(proto.NetworkEnable{})
-	go page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
+	Page.EnableDomain(proto.NetworkEnable{})
+	go Page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
 		msg := fmt.Sprintf("Request sent: %s", e.Request.URL)
 		if ShowNetActivity {
 			fmt.Printf(msg)
 		}
-			eventLog.Add(msg)
+		eventLog.Add(msg)
 	})()
-	go page.EachEvent(func(e *proto.NetworkResponseReceived) {
+	go Page.EachEvent(func(e *proto.NetworkResponseReceived) {
 		msg := fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status)
 		if ShowNetActivity {
 			fmt.Printf(msg)
 		}
-			eventLog.Add(msg)
+		eventLog.Add(msg)
 	})()
 
-	err := page.Navigate(targetURL)
+	err := Page.Navigate(targetURL)
 	if err != nil {
 		return nil, err
 	}
-	page.WaitLoad()
-		// eventLog.Display()
-	return page, nil
+	Page.WaitLoad()
+	return Page, nil
 }
 func reportOnHeadings(Page *rod.Page) {
 	// Get all headings
@@ -142,19 +145,20 @@ func reportOnHeadings(Page *rod.Page) {
 		firstHeading := headings[0]
 		fontFamily := firstHeading.MustEval(`() => getComputedStyle(this).fontFamily`).String()
 		fmt.Println("Font Family of the first heading:", fontFamily)
-		CurrentElement = firstHeading 
+		CurrentElement = firstHeading
 		/*
-		computedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`)
-		fmt.Println("computed styles", PrettyFormat(computedStyles))
-		// description := firstHeading.MustDescribe()
-		// fmt.Println("Description: ", PrettyFormat(description))
+			computedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`)
+			fmt.Println("computed styles", PrettyFormat(computedStyles))
+			// description := firstHeading.MustDescribe()
+			// fmt.Println("Description: ", PrettyFormat(description))
 		*/
 	}
 }
+
 // PrettyFormat function
 func PrettyFormat(v interface{}) string {
 	b, _ := json.MarshalIndent(v, "", "  ")
-return string(b)
+	return string(b)
 }
 
 // prettyPrintJson function
@@ -164,16 +168,16 @@ func prettyPrintJson(s string) string {
 	b, _ := json.MarshalIndent(i, "", "  ")
 	return string(b)
 }
-  func ReportElement(el *rod.Element) {
-      tagName := el.MustEval("() => this.tagName").String()
-      childrenCount := len(el.MustElements("*"))
-      text := el.MustText()
+func ReportElement(el *rod.Element) {
+	tagName := el.MustEval("() => this.tagName").String()
+	childrenCount := len(el.MustElements("*"))
+	text := el.MustText()
 
-      // Limit the text to maxChars characters
-      limitedText := fmt.Sprintf("%.100s", text)
+	// Limit the text to maxChars characters
+	limitedText := fmt.Sprintf("%.100s", text)
 
-      fmt.Printf("%s, %d children, %s\n", tagName, childrenCount, limitedText)
-  }
+	fmt.Printf("%s, %d children, %s\n", tagName, childrenCount, limitedText)
+}
 
 func Box(el *rod.Element) error {
 	shape, err := el.Shape()

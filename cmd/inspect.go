@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 	"github.com/spf13/cobra"
+	"strconv"
 )
 
 var BoxCmd = &cobra.Command{
@@ -44,6 +44,8 @@ var HtmlCmd = &cobra.Command{
 	Use:   "html",
 	Short: "Print the HTML of the current element",
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(args)
+		return
 		if !hasCurrentElement() {
 			return
 		}
@@ -57,4 +59,3 @@ func init() {
 	RootCmd.AddCommand(TextCmd)
 	RootCmd.AddCommand(HtmlCmd)
 }
-

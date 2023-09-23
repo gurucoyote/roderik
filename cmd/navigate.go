@@ -77,17 +77,17 @@ var NextCmd = &cobra.Command{
 	Short: "Navigate to the next element",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-			if !hasCurrentElement() {
-				return
-			}
+		if !hasCurrentElement() {
+			return
+		}
 		// ReportElement(CurrentElement)
-			nextElement, err := CurrentElement.Next()
-			if err != nil {
-				fmt.Println("Error navigating to the next element:", err)
-				return
-			}
-			CurrentElement = nextElement
-			ReportElement(nextElement)
+		nextElement, err := CurrentElement.Next()
+		if err != nil {
+			fmt.Println("Error navigating to the next element:", err)
+			return
+		}
+		CurrentElement = nextElement
+		ReportElement(nextElement)
 	},
 }
 
@@ -137,7 +137,7 @@ var PrevCmd = &cobra.Command{
 			return
 		}
 		CurrentElement = prevElement
-			ReportElement(prevElement)
+		ReportElement(prevElement)
 	},
 }
 
@@ -172,4 +172,3 @@ var ParentCmd = &cobra.Command{
 		ReportElement(CurrentElement)
 	},
 }
-

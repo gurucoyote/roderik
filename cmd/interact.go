@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/spf13/cobra"
 )
 
 var ClickCmd = &cobra.Command{
