@@ -5,11 +5,31 @@ import (
 	"os"
 	"path/filepath"
 	"encoding/json"
+	"sync"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
 )
+var ShowNetActivity bool
+type EventLog struct {
+	mu    sync.Mutex
+	logs  []string
+}
+func (l *EventLog) Add(log string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logs = append(l.logs, log)
+}
+
+func (l *EventLog) Display() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, log := range l.logs {
+		fmt.Println(log)
+	}
+}
 
 var Page *rod.Page
 var CurrentElement *rod.Element
@@ -83,11 +103,31 @@ func PrepareBrowser() (*rod.Browser, error) {
 }
 func LoadURL(browser *rod.Browser, targetURL string) (*rod.Page, error) {
 	page := browser.MustPage("about:blank")
+	 // setup network aktivity logging
+	eventLog := &EventLog{}
+
+	page.EnableDomain(proto.NetworkEnable{})
+	go page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
+		msg := fmt.Sprintf("Request sent: %s", e.Request.URL)
+		if ShowNetActivity {
+			fmt.Printf(msg)
+		}
+			eventLog.Add(msg)
+	})()
+	go page.EachEvent(func(e *proto.NetworkResponseReceived) {
+		msg := fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status)
+		if ShowNetActivity {
+			fmt.Printf(msg)
+		}
+			eventLog.Add(msg)
+	})()
+
 	err := page.Navigate(targetURL)
 	if err != nil {
 		return nil, err
 	}
 	page.WaitLoad()
+		// eventLog.Display()
 	return page, nil
 }
 func reportOnHeadings(Page *rod.Page) {
