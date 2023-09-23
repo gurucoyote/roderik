@@ -107,6 +107,15 @@ func PrepareBrowser() (*rod.Browser, error) {
 
 	return browser, nil
 }
+import (
+	"net/url"
+)
+
+func isValidURL(str string) bool {
+	u, err := url.Parse(str)
+	return err == nil && u.Scheme != "" && u.Host != ""
+}
+
 func LoadURL(targetURL string) (*rod.Page, error) {
 	// setup network aktivity logging
 	eventLog := &EventLog{}
