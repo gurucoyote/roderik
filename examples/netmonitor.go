@@ -8,6 +8,8 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 )
 
+var ShowNetActivity bool
+
 type EventLog struct {
 	mu    sync.Mutex
 	logs  []string
@@ -37,14 +39,24 @@ func main() {
 
 	page.EnableDomain(proto.NetworkEnable{})
 	go page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
-		eventLog.Add(fmt.Sprintf("Request sent: %s", e.Request.URL))
+		if ShowNetActivity {
+			fmt.Printf("Request sent: %s\n", e.Request.URL)
+		} else {
+			eventLog.Add(fmt.Sprintf("Request sent: %s", e.Request.URL))
+		}
 	})()
 	go page.EachEvent(func(e *proto.NetworkResponseReceived) {
-		eventLog.Add(fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status))
+		if ShowNetActivity {
+			fmt.Printf("Response received: %s Status: %d\n", e.Response.URL, e.Response.Status)
+		} else {
+			eventLog.Add(fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status))
+		}
 	})()
 
 	page.MustNavigate("https://example.com")
 
 	// Display the logs
-	eventLog.Display()
+	if !ShowNetActivity {
+		eventLog.Display()
+	}
 }
