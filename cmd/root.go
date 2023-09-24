@@ -58,10 +58,10 @@ var RootCmd = &cobra.Command{
 		// fmt.Println(Page.MustInfo())
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		// set interactive mode for this root command by default
+		Interactive = true
 
 		targetURL := args[0]
-		fmt.Println("Target URL:", targetURL)
-
 		// Load the target URL
 		Page, err := LoadURL(targetURL)
 		if err != nil {
@@ -74,6 +74,8 @@ var RootCmd = &cobra.Command{
 		headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
 		if len(headings) > 0 {
 			CurrentElement = headings[0]
+		} else {
+			CurrentElement = Page.MustElement("body")
 		}
 		// Report on the headings
 		reportOnHeadings(Page)
@@ -139,6 +141,11 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 			fmt.Printf(msg)
 		}
 		eventLog.Add(msg)
+	})()
+	// setup event listener for navigate events
+	go Page.EachEvent(func(e *proto.PageFrameNavigated) {
+		fmt.Println("Navigated to: ", e.Frame.URL)
+		CurrentElement = Page.MustElement("body")
 	})()
 
 	err := Page.Navigate(targetURL)
