@@ -46,14 +46,16 @@ var RootCmd = &cobra.Command{
 	Long:  `Roderik is a command-line tool that allows you to navigate, inspect, and interact with elements on a webpage. It uses the Go Rod library for web scraping and automation. You can use it to walk through the DOM, get information about elements, and perform actions like clicking or typing.`,
 	Args:  cobra.MinimumNArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Prepare the browser
-		Browser, err := PrepareBrowser()
-		if err != nil {
-			fmt.Println("Error preparing browser:", err)
-			return
+		if Page == nil {
+			// Prepare the browser
+			Browser, err := PrepareBrowser()
+			if err != nil {
+				fmt.Println("Error preparing browser:", err)
+				return
+			}
+			Page = Browser.MustPage("about:blank")
 		}
-		Page = Browser.MustPage("about:blank")
-		Page.MustInfo()
+		// fmt.Println(Page.MustInfo())
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 

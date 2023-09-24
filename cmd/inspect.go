@@ -52,9 +52,7 @@ var HtmlCmd = &cobra.Command{
 					fmt.Println("Error loading URL:", err)
 					return
 				}
-				html := Page.MustHTML()
-				fmt.Println(html)
-				return
+				CurrentElement = Page.MustElement("html")
 			}
 		}
 		if !hasCurrentElement() {
