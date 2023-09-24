@@ -6,10 +6,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
-	"github.com/chzyer/readline"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
@@ -201,23 +199,4 @@ func Box(el *rod.Element) error {
 	box := shape.Box()
 	fmt.Println("box: ", PrettyFormat(box))
 	return nil
-}
-func Repl() {
-
-	if Interactive {
-		// enter repl loop
-		rl, _ := readline.New("> ")
-		defer rl.Close()
-		for {
-			input, _ := rl.Readline()
-			if input == "exit" {
-				fmt.Println("Goodbye")
-				break
-			}
-
-			args := strings.Fields(input)
-			RootCmd.SetArgs(args)
-			RootCmd.Execute()
-		}
-	}
 }
