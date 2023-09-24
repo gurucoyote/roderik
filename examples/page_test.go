@@ -910,3 +910,13 @@ func TestMonitorNetworkEvents(t *testing.T) {
 	// Display the logs
 	eventLog.Display()
 }
+func TestPageNavigationEvent(t *testing.T) {
+	g := setup(t)
+	page := g.newPage()
+
+	go page.EachEvent(func(e *proto.PageFrameNavigated) {
+		log.Println("Navigated to: ", e.Frame.URL)
+	})()
+
+	page.MustNavigate("https://example.com")
+}
