@@ -78,6 +78,10 @@ var RootCmd = &cobra.Command{
 		// Report on the headings
 		reportOnHeadings(Page)
 	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		// This function will always be run after any command (including sub-commands) is executed
+		fmt.Println("Post-run function executed")
+	},
 }
 
 func init() {
