@@ -79,6 +79,8 @@ var RootCmd = &cobra.Command{
 		}
 		// Report on the headings
 		reportOnHeadings(Page)
+		// simple test for console output
+		Page.MustEval(`() => console.log("hello world")`)
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 		// This function will always be run after any command (including sub-commands) is executed
@@ -148,6 +150,10 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 		CurrentElement = Page.MustElement("body")
 	})()
 
+	// Listen for all events of console output.
+	go Page.EachEvent(func(e *proto.RuntimeConsoleAPICalled) {
+		fmt.Println("console: ", Page.MustObjectsToJSON(e.Args))
+	})()
 	err := Page.Navigate(targetURL)
 	if err != nil {
 		return nil, err
