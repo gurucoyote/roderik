@@ -1,7 +1,10 @@
+package cmd
+
 import (
-	"net/http"
 	"flag"
+	"fmt"
 	"github.com/spf13/cobra"
+	"net/http"
 )
 
 var port int
@@ -16,12 +19,12 @@ var serverCmd = &cobra.Command{
 		addr := fmt.Sprintf(":%d", port)
 		fmt.Printf("Starting server on %s\n", addr)
 		if err := http.ListenAndServe(addr, nil); err != nil {
-			log.Fatal(err)
+			panic(err)
 		}
 	},
 }
 
 func init() {
 	flag.IntVar(&port, "port", 80, "Port to run the server on")
-	rootCmd.AddCommand(serverCmd)
+	RootCmd.AddCommand(serverCmd)
 }
