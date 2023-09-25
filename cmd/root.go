@@ -22,6 +22,15 @@ func GetUserInput(prompt string) string {
 	return text
 }
 
+func AskForConfirmation(prompt string) bool {
+	response := GetUserInput(prompt)
+	firstChar := strings.ToLower(string(response[0]))
+	if firstChar == "y" {
+		return true
+	}
+	return false
+}
+
 var ShowNetActivity bool
 var Interactive bool
 
