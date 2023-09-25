@@ -151,6 +151,7 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	})()
 	// setup event listener for dialogs
 	go Page.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
+		fmt.Println("Dialog message: ", e.Message)
 		_ = proto.PageHandleJavaScriptDialog{Accept: false, PromptText: ""}.Call(Page)
 	})()
 
