@@ -55,9 +55,3 @@ func init() {
 	serverCmd.Flags().BoolVarP(&basicAuth, "basic-auth", "a", false, "Require basic auth")
 	RootCmd.AddCommand(serverCmd)
 }
-
-func init() {
-	flag.IntVarP(&port, "port", "p", 80, "Port to run the server on")
-	flag.BoolVarP(&basicAuth, "basic-auth", "a", false, "Require basic auth")
-	RootCmd.AddCommand(serverCmd)
-}
