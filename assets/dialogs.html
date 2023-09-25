@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dialogs</title>
+</head>
+<body>
+    <h1 id="greeting"></h1>
+
+    <script>
+        var name = prompt("Please enter your name", "Harry Potter");
+        var config = confirm("Do you want to be greeted by your name?");
+
+        var greeting;
+        if (config == true) {
+            greeting = "Hello, " + name + "!";
+        } else {
+            greeting = "Hello, User!";
+        }
+
+        alert(greeting);
+        document.getElementById("greeting").innerHTML = greeting;
+    </script>
+</body>
+</html>
