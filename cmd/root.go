@@ -170,7 +170,17 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	// setup event listener for dialogs
 	go Page.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
 		fmt.Println("Dialog type: ", e.Type, "Dialog message: ", e.Message)
-		_ = proto.PageHandleJavaScriptDialog{Accept: false, PromptText: ""}.Call(Page)
+		switch e.Type {
+		case "prompt":
+			userInput := GetUserInput(e.Message + " ")
+			_ = proto.PageHandleJavaScriptDialog{Accept: true, PromptText: userInput}.Call(Page)
+		case "confirm":
+			confirmation := AskForConfirmation(e.Message + " (y/n) ")
+			_ = proto.PageHandleJavaScriptDialog{Accept: confirmation, PromptText: ""}.Call(Page)
+		case "alert":
+			fmt.Println(e.Message)
+			_ = proto.PageHandleJavaScriptDialog{Accept: true, PromptText: ""}.Call(Page)
+		}
 	})()
 
 	// Listen for all events of console output.
