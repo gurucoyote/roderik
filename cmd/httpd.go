@@ -51,6 +51,12 @@ var serverCmd = &cobra.Command{
 }
 
 func init() {
+	serverCmd.Flags().IntVar(&port, "port", 80, "Port to run the server on")
+	serverCmd.Flags().BoolVar(&basicAuth, "basic-auth", false, "Require basic auth")
+	RootCmd.AddCommand(serverCmd)
+}
+
+func init() {
 	flag.IntVar(&port, "port", 80, "Port to run the server on")
 	flag.BoolVar(&basicAuth, "basic-auth", false, "Require basic auth")
 	RootCmd.AddCommand(serverCmd)
