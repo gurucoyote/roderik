@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/base64"
-	"flag"
 	"fmt"
 	"github.com/spf13/cobra"
 	"net/http"
