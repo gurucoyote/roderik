@@ -36,7 +36,9 @@ var serverCmd = &cobra.Command{
 				}
 			}
 
+			fmt.Println("Requested URI: ", r.RequestURI)
 			fs.ServeHTTP(w, r)
+			fmt.Println("Response status: ", w.Header().Get("Status"))
 		})
 
 		http.Handle("/", handler)
