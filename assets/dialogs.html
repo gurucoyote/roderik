@@ -8,11 +8,15 @@
 
     <script>
         var name = prompt("Please enter your name", "Harry Potter");
-        var config = confirm("Do you want to be greeted by your name?");
-
         var greeting;
-        if (config == true) {
-            greeting = "Hello, " + name + "!";
+
+        if (name != null) {
+            var config = confirm("Do you want to be greeted by your name?");
+            if (config == true) {
+                greeting = "Hello, " + name + "!";
+            } else {
+                greeting = "Hello, User!";
+            }
         } else {
             greeting = "Hello, User!";
         }
