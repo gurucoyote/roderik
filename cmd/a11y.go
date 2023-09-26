@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var QaccCmd = &cobra.Command{
-	Use:   "qacc",
+var quaxCmd = &cobra.Command{
+	Use:   "quax",
 	Short: "Query the accessibility tree of the current element",
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
@@ -48,28 +48,39 @@ var QaccCmd = &cobra.Command{
 				continue
 			}
 			if Verbose {
-			// Relevant info: computed string as text, source, number of children, ids and role
-			fmt.Println("Node ID:", node.NodeID)
-			fmt.Println("Role:", node.Role.Value)
-			fmt.Println("Backend DOM Node ID:", node.BackendDOMNodeID)
-			fmt.Println("Parent ID:", node.ParentID)
-			if node.Name != nil {
-				fmt.Println("Name:", node.Name.Value)
+				// Relevant info: computed string as text, source, number of children, ids and role
+				fmt.Println("Node ID:", node.NodeID)
+				fmt.Println("Role:", node.Role.Value)
+				fmt.Println("Backend DOM Node ID:", node.BackendDOMNodeID)
+				fmt.Println("Parent ID:", node.ParentID)
+				if node.Name != nil {
+					fmt.Println("Name:", node.Name.Value)
+				}
+				fmt.Println("Number of children:", len(node.ChildIds))
+				fmt.Println("Child IDs:", node.ChildIds)
+			} else {
+				// fmt.Print(node.NodeID, ": ")
+				switch node.Role.Value.String() {
+				case "LineBreak":
+				case "generic":
+				case "paragraph":
+					fmt.Print("\n")
+					fmt.Println(node.Name.Value)
+				case "seperator":
+					fmt.Println("---")
+				case "listitem":
+					fmt.Print("- ")
+				case "link", "button", "textbox":
+					fmt.Print(node.Role.Value.String(), "(", node.NodeID, ") ")
+				case "StaticText":
+					fmt.Println(node.Name.Value)
+				default:
+					fmt.Print(node.Role.Value.String(), ": ")
+					fmt.Println(node.Name.Value)
+				}
+				if node.Name != nil {
+				}
 			}
-			fmt.Println("Number of children:", len(node.ChildIds))
-			fmt.Println("Child IDs:", node.ChildIds)
-		} else {
-			fmt.Print( node.NodeID, ": ")
-			switch node.Role.Value.String(){
-			case "\"paragraph\"":
-				fmt.Println()
-			default:
-			fmt.Print( node.Role.Value.String(), ": ")
-		}
-			if node.Name != nil {
-				fmt.Println( node.Name.Value)
-			}
-		}
 		}
 		if Verbose {
 			// debug: print the tree as json
@@ -84,5 +95,5 @@ var QaccCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(QaccCmd)
+	RootCmd.AddCommand(quaxCmd)
 }
