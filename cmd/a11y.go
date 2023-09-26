@@ -46,12 +46,23 @@ var A11yCmd = &cobra.Command{
 				}
 			}
 		}
-		//TODO: iterate over the Nodes of the partial tree and output relevant info
-		// filter out any nodes that have ignore set to true
-		// relevant info: 
-		// - computed string as text
-		// - source
-		// - numberof children and ids
+		// Iterate over the Nodes of the partial tree and output relevant info
+		for _, node := range partialAXTree.Nodes {
+			// Filter out any nodes that have ignore set to true
+			if node.Ignored {
+				continue
+			}
+			// Relevant info: computed string as text, source, number of children and ids
+			fmt.Println("Node ID:", node.NodeID)
+			if node.Name != nil {
+				fmt.Println("Computed string:", node.Name.Value)
+				for _, source := range node.Name.Sources {
+					fmt.Println("Source:", source.Type)
+				}
+			}
+			fmt.Println("Number of children:", len(node.ChildIds))
+			fmt.Println("Child IDs:", node.ChildIds)
+		}
 		if !hasCurrentElement() {
 			return
 		}
