@@ -35,6 +35,7 @@ var QaccCmd = &cobra.Command{
 		// Query the accessibility tree for this element
 		queryAXTree, err := proto.AccessibilityQueryAXTree{
 			BackendNodeID: elementProperties.BackendNodeID,
+			// I think we can specify a depth, not sure if it makes sense to da that here
 		}.Call(Page)
 		if err != nil {
 			fmt.Println("Error querying accessibility tree:", err)
@@ -46,6 +47,7 @@ var QaccCmd = &cobra.Command{
 			if node.Ignored {
 				continue
 			}
+			if Verbose {
 			// Relevant info: computed string as text, source, number of children, ids and role
 			fmt.Println("Node ID:", node.NodeID)
 			fmt.Println("Role:", node.Role.Value)
@@ -53,20 +55,21 @@ var QaccCmd = &cobra.Command{
 			fmt.Println("Parent ID:", node.ParentID)
 			if node.Name != nil {
 				fmt.Println("Name:", node.Name.Value)
-				if false {
-					for _, source := range node.Name.Sources {
-						fmt.Println("Source:", source.Type)
-						if source.Attribute != "" {
-							fmt.Println("Attribute:", source.Attribute)
-						}
-						if source.Value != nil {
-							fmt.Println("Value:", source.Value.Value)
-						}
-					}
-				}
 			}
 			fmt.Println("Number of children:", len(node.ChildIds))
 			fmt.Println("Child IDs:", node.ChildIds)
+		} else {
+			fmt.Print( node.NodeID, ": ")
+			switch node.Role.Value{
+			case "paragraph":
+				fmt.Println()
+			default:
+			fmt.Print( node.Role.Value, ": ")
+		}
+			if node.Name != nil {
+				fmt.Println( node.Name.Value)
+			}
+		}
 		}
 		if Verbose {
 			// debug: print the tree as json
