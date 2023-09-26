@@ -7,9 +7,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var A11yCmd = &cobra.Command{
-	Use:   "a11y",
-	Short: "Access the accessibility tree of the current element",
+var QaccCmd = &cobra.Command{
+	Use:   "qacc",
+	Short: "Query the accessibility tree of the current element",
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
 			url := args[0]
@@ -32,16 +32,16 @@ var A11yCmd = &cobra.Command{
 			return
 		}
 
-		// Fetch the partial accessibility tree for this element
-		partialAXTree, err := proto.AccessibilityGetPartialAXTree{
+		// Query the accessibility tree for this element
+		queryAXTree, err := proto.AccessibilityQueryAXTree{
 			BackendNodeID: elementProperties.BackendNodeID,
 		}.Call(Page)
 		if err != nil {
-			fmt.Println("Error fetching partial accessibility tree:", err)
+			fmt.Println("Error querying accessibility tree:", err)
 			return
 		}
-		// Iterate over the Nodes of the partial tree and output relevant info
-		for _, node := range partialAXTree.Nodes {
+		// Iterate over the Nodes of the queried tree and output relevant info
+		for _, node := range queryAXTree.Nodes {
 			// Filter out any nodes that have ignore set to true
 			if node.Ignored {
 				continue
@@ -70,7 +70,7 @@ var A11yCmd = &cobra.Command{
 		}
 		if Verbose {
 			// debug: print the tree as json
-			treeJSON, err := json.MarshalIndent(partialAXTree, "", "  ")
+			treeJSON, err := json.MarshalIndent(queryAXTree, "", "  ")
 			if err != nil {
 				fmt.Println("Error converting node to JSON:", err)
 				return
@@ -81,5 +81,5 @@ var A11yCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(A11yCmd)
+	RootCmd.AddCommand(QaccCmd)
 }
