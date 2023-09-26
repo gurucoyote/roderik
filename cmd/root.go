@@ -89,7 +89,7 @@ var RootCmd = &cobra.Command{
 
 		info := Page.MustInfo()
 		fmt.Println("Opened URL:", info.URL, info.Title)
-		headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
+		headings, _ := Page.Elements("h1, h2, h3, h4, h5, h6")
 		if len(headings) > 0 {
 			CurrentElement = headings[0]
 		} else {
