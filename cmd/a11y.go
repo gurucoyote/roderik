@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/ysmood/rod/lib/proto"
+	"github.com/go-rod/rod/lib/proto"
 )
 
 var A11yCmd = &cobra.Command{
@@ -19,9 +19,12 @@ var A11yCmd = &cobra.Command{
 					return
 				}
 				CurrentElement = Page.MustElement("body")
+				// TODO: use CurrentElement.Describe(0, false) to get the element's properties
+				// TODO: output the resulting struct as a indented JSON string
+
 				// Fetch the partial accessibility tree
 				partialAXTree, err := proto.AccessibilityGetPartialAXTree{
-					NodeID: CurrentElement.MustNodeID(),
+					NodeID: nil,
 				}.Call(Page)
 				if err != nil {
 					fmt.Println("Error fetching partial accessibility tree:", err)
