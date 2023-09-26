@@ -37,7 +37,7 @@ var A11yCmd = &cobra.Command{
 
 				// Fetch the partial accessibility tree
 				partialAXTree, err := proto.AccessibilityGetPartialAXTree{
-					NodeID: nil,
+					BackendNodeID: elementProperties.BackendNodeID,
 				}.Call(Page)
 				if err != nil {
 					fmt.Println("Error fetching partial accessibility tree:", err)
@@ -50,7 +50,7 @@ var A11yCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
-		ReportElement(CurrentElement)
+		// ReportElement(CurrentElement)
 	},
 }
 
