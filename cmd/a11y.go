@@ -3,9 +3,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
+	"strconv"
 )
 
 var quaxCmd = &cobra.Command{
@@ -104,7 +104,6 @@ var pickCmd = &cobra.Command{
 	Short: "Pick a node by its id",
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
-			//TODO: the nodeID here must be an integer
 			nodeID, err := strconv.Atoi(args[0])
 			if err != nil {
 				fmt.Println("Error converting node ID to integer:", err)
@@ -112,7 +111,11 @@ var pickCmd = &cobra.Command{
 			}
 			fmt.Println("Picking node with ID:", nodeID)
 			// Set CurrentElement to the node that corresponds to this id
-			Page.MustElementFromNode(&proto.DOMNode{NodeID: proto.DOMNodeID(nodeID)})
+			CurrentElement, err = Page.ElementFromNode(&proto.DOMNode{NodeID: proto.DOMNodeID(nodeID)})
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 		} else {
 			fmt.Println("Please provide a node ID")
 		}
