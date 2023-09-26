@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/go-rod/rod"
 )
 
 var A11yCmd = &cobra.Command{
@@ -12,9 +13,7 @@ var A11yCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
-		currentTag := CurrentElement.MustDescribe().LocalName
-		childrenCount := len(CurrentElement.MustElements("*"))
-		fmt.Printf("Current tag: %s, Children count: %d\n", currentTag, childrenCount)
+		ReportElement(CurrentElement)
 	},
 }
 
