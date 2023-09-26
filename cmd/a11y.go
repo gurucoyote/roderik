@@ -43,8 +43,16 @@ var A11yCmd = &cobra.Command{
 					fmt.Println("Error fetching partial accessibility tree:", err)
 					return
 				}
-				// Print the partial accessibility tree
-				fmt.Println(partialAXTree.Nodes)
+				// Debug: Iterate over the nodes in the partial accessibility tree and print their properties
+				for i, node := range partialAXTree.Nodes {
+					fmt.Printf("Node %d:\n", i)
+					nodeJSON, err := json.MarshalIndent(node, "", "  ")
+					if err != nil {
+						fmt.Println("Error converting node to JSON:", err)
+						return
+					}
+					fmt.Println(string(nodeJSON))
+				}
 			}
 		}
 		if !hasCurrentElement() {
