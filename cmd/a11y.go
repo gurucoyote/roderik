@@ -95,4 +95,19 @@ var quaxCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(quaxCmd)
+	RootCmd.AddCommand(pickCmd)
+}
+
+var pickCmd = &cobra.Command{
+	Use:   "pick",
+	Short: "Pick a node by its id",
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) > 0 {
+			nodeID := args[0]
+			fmt.Println("Picking node with ID:", nodeID)
+			// TODO: Set CurrentElement to the node that corresponds to this id
+		} else {
+			fmt.Println("Please provide a node ID")
+		}
+	},
 }
