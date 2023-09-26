@@ -104,10 +104,14 @@ var pickCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
 			//TODO: the nodeID here must be an integer
-			nodeID := args[0]
+			nodeID, err := strconv.Atoi(args[0])
+			if err != nil {
+				fmt.Println("Error converting node ID to integer:", err)
+				return
+			}
 			fmt.Println("Picking node with ID:", nodeID)
 			// Set CurrentElement to the node that corresponds to this id
-			Page.MustElementFromNode(&proto.DOMNode{NodeID: nodeID})
+			Page.MustElementFromNode(&proto.DOMNode{NodeID: proto.NodeID(nodeID)})
 		} else {
 			fmt.Println("Please provide a node ID")
 		}
