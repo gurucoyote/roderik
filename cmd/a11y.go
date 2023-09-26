@@ -49,6 +49,8 @@ var A11yCmd = &cobra.Command{
 			// Relevant info: computed string as text, source, number of children, ids and role
 			fmt.Println("Node ID:", node.NodeID)
 			fmt.Println("Role:", node.Role.Value)
+			fmt.Println("Backend DOM Node ID:", node.BackendDOMNodeId)
+			fmt.Println("Parent ID:", node.ParentId)
 			if node.Name != nil {
 				fmt.Println("Name:", node.Name.Value)
 				if false {
