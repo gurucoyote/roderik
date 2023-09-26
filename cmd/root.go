@@ -34,6 +34,7 @@ func AskForConfirmation(prompt string) bool {
 
 var ShowNetActivity bool
 var Interactive bool
+var Verbose bool
 
 type EventLog struct {
 	mu   sync.Mutex
@@ -109,6 +110,7 @@ func init() {
 	// Sub commands removed
 	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
 	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
+	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose mode")
 }
 func PrepareBrowser() (*rod.Browser, error) {
 	// Ensure user data directory exists
