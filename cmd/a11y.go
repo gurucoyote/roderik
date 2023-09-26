@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/ysmood/rod/lib/proto"
 )
 
 var A11yCmd = &cobra.Command{
@@ -18,6 +19,16 @@ var A11yCmd = &cobra.Command{
 					return
 				}
 				CurrentElement = Page.MustElement("body")
+				// Fetch the partial accessibility tree
+				partialAXTree, err := proto.AccessibilityGetPartialAXTree{
+					NodeID: CurrentElement.MustNodeID(),
+				}.Call(Page)
+				if err != nil {
+					fmt.Println("Error fetching partial accessibility tree:", err)
+					return
+				}
+				// Print the partial accessibility tree
+				fmt.Println(partialAXTree.Nodes)
 			}
 		}
 		if !hasCurrentElement() {
