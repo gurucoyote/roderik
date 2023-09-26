@@ -60,11 +60,11 @@ var QaccCmd = &cobra.Command{
 			fmt.Println("Child IDs:", node.ChildIds)
 		} else {
 			fmt.Print( node.NodeID, ": ")
-			switch node.Role.Value{
+			switch node.Role.Value.Value{
 			case "paragraph":
 				fmt.Println()
 			default:
-			fmt.Print( node.Role.Value, ": ")
+			fmt.Print( node.Role.Value.Value, ": ")
 		}
 			if node.Name != nil {
 				fmt.Println( node.Name.Value)
