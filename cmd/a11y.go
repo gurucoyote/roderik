@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/go-rod/rod/lib/proto"
@@ -19,8 +20,20 @@ var A11yCmd = &cobra.Command{
 					return
 				}
 				CurrentElement = Page.MustElement("body")
-				// TODO: use CurrentElement.Describe(0, false) to get the element's properties
-				// TODO: output the resulting struct as a indented JSON string
+				// Get the element's properties
+				elementProperties, err := CurrentElement.Describe(0, false)
+				if err != nil {
+					fmt.Println("Error describing element:", err)
+					return
+				}
+				// Convert the element properties to an indented JSON string
+				elementPropertiesJSON, err := json.MarshalIndent(elementProperties, "", "  ")
+				if err != nil {
+					fmt.Println("Error converting element properties to JSON:", err)
+					return
+				}
+				// Output the element properties
+				fmt.Println(string(elementPropertiesJSON))
 
 				// Fetch the partial accessibility tree
 				partialAXTree, err := proto.AccessibilityGetPartialAXTree{
