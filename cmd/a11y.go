@@ -112,7 +112,7 @@ var pickCmd = &cobra.Command{
 			}
 			fmt.Println("Picking node with ID:", nodeID)
 			// Set CurrentElement to the node that corresponds to this id
-			Page.MustElementFromNode(&proto.DOMNode{NodeID: proto.NodeID(nodeID)})
+			Page.MustElementFromNode(&proto.DOMNode{NodeID: proto.DOMNodeID(nodeID)})
 		} else {
 			fmt.Println("Please provide a node ID")
 		}
