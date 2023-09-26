@@ -50,14 +50,16 @@ var A11yCmd = &cobra.Command{
 			fmt.Println("Node ID:", node.NodeID)
 			fmt.Println("Role:", node.Role.Value)
 			if node.Name != nil {
-				fmt.Println("Computed string:", node.Name.Value)
-				for _, source := range node.Name.Sources {
-					fmt.Println("Source:", source.Type)
-					if source.Attribute != "" {
-						fmt.Println("Attribute:", source.Attribute)
-					}
-					if source.Value != nil {
-						fmt.Println("Value:", source.Value.Value)
+				fmt.Println("Name:", node.Name.Value)
+				if false {
+					for _, source := range node.Name.Sources {
+						fmt.Println("Source:", source.Type)
+						if source.Attribute != "" {
+							fmt.Println("Attribute:", source.Attribute)
+						}
+						if source.Value != nil {
+							fmt.Println("Value:", source.Value.Value)
+						}
 					}
 				}
 			}
