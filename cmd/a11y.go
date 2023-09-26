@@ -103,9 +103,11 @@ var pickCmd = &cobra.Command{
 	Short: "Pick a node by its id",
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
+			//TODO: the nodeID here must be an integer
 			nodeID := args[0]
 			fmt.Println("Picking node with ID:", nodeID)
-			// TODO: Set CurrentElement to the node that corresponds to this id
+			// Set CurrentElement to the node that corresponds to this id
+		Page.MustElementFromNode(&proto.DOMNode{NodeID: nodeID})
 		} else {
 			fmt.Println("Please provide a node ID")
 		}
