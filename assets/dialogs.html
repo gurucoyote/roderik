@@ -9,8 +9,8 @@
     <script>
         var name = prompt("Please enter your name", "Harry Potter");
         var greeting;
-
-        if (name != null) {
+console.log(name)
+        if (name !== null) {
             var config = confirm("Do you want to be greeted by your name?");
             if (config == true) {
                 greeting = "Hello, " + name + "!";
@@ -22,6 +22,7 @@
         }
 
         alert(greeting);
+	console.log(greeting)
         document.getElementById("greeting").innerHTML = greeting;
     </script>
 </body>
