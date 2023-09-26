@@ -13,7 +13,7 @@ var A11yCmd = &cobra.Command{
 			return
 		}
 		currentTag := CurrentElement.MustDescribe().LocalName
-		childrenCount := len(CurrentElement.MustChildren())
+		childrenCount := len(CurrentElement.MustElements("*"))
 		fmt.Printf("Current tag: %s, Children count: %d\n", currentTag, childrenCount)
 	},
 }
