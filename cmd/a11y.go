@@ -3,8 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/cobra"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/spf13/cobra"
 )
 
 var A11yCmd = &cobra.Command{
@@ -35,8 +35,25 @@ var A11yCmd = &cobra.Command{
 					fmt.Println("Error fetching partial accessibility tree:", err)
 					return
 				}
-				if false {
-				// debug: print the tree as json
+				// Iterate over the Nodes of the partial tree and output relevant info
+				for _, node := range partialAXTree.Nodes {
+					// Filter out any nodes that have ignore set to true
+					if node.Ignored {
+						continue
+					}
+					// Relevant info: computed string as text, source, number of children and ids
+					fmt.Println("Node ID:", node.NodeID)
+					if node.Name != nil {
+						fmt.Println("Computed string:", node.Name.Value)
+						for _, source := range node.Name.Sources {
+							fmt.Println("Source:", source.Type)
+						}
+					}
+					fmt.Println("Number of children:", len(node.ChildIds))
+					fmt.Println("Child IDs:", node.ChildIds)
+				}
+				if Verbose {
+					// debug: print the tree as json
 					treeJSON, err := json.MarshalIndent(partialAXTree, "", "  ")
 					if err != nil {
 						fmt.Println("Error converting node to JSON:", err)
@@ -45,23 +62,6 @@ var A11yCmd = &cobra.Command{
 					fmt.Println(string(treeJSON))
 				}
 			}
-		}
-		// Iterate over the Nodes of the partial tree and output relevant info
-		for _, node := range partialAXTree.Nodes {
-			// Filter out any nodes that have ignore set to true
-			if node.Ignored {
-				continue
-			}
-			// Relevant info: computed string as text, source, number of children and ids
-			fmt.Println("Node ID:", node.NodeID)
-			if node.Name != nil {
-				fmt.Println("Computed string:", node.Name.Value)
-				for _, source := range node.Name.Sources {
-					fmt.Println("Source:", source.Type)
-				}
-			}
-			fmt.Println("Number of children:", len(node.ChildIds))
-			fmt.Println("Child IDs:", node.ChildIds)
 		}
 		if !hasCurrentElement() {
 			return
