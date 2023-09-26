@@ -59,7 +59,6 @@ var quaxCmd = &cobra.Command{
 				fmt.Println("Number of children:", len(node.ChildIds))
 				fmt.Println("Child IDs:", node.ChildIds)
 			} else {
-				// fmt.Print(node.NodeID, ": ")
 				switch node.Role.Value.String() {
 				case "LineBreak":
 				case "generic":
@@ -71,7 +70,7 @@ var quaxCmd = &cobra.Command{
 				case "listitem":
 					fmt.Print("- ")
 				case "link", "button", "textbox":
-					fmt.Print(node.Role.Value.String(), "(", node.NodeID, ") ")
+					fmt.Print(node.Role.Value.String(), "(", node.BackendDOMNodeID, ") ")
 				case "StaticText":
 					fmt.Println(node.Name.Value)
 				default:
