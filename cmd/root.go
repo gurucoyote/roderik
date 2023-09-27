@@ -252,3 +252,24 @@ var ClearCmd = &cobra.Command{
 		}
 	},
 }
+
+var ExitCmd = &cobra.Command{
+	Use:     "exit",
+	Aliases: []string{"q", "Q", "bye"},
+	Short:   "Exit the application",
+	Long:    `This command will exit the application.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Goodbye!")
+		os.Exit(0)
+	},
+}
+
+func init() {
+	// Sub commands removed
+	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
+	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
+	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose mode")
+
+	RootCmd.AddCommand(ClearCmd)
+	RootCmd.AddCommand(ExitCmd)
+}
