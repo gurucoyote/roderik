@@ -1,13 +1,15 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"encoding/json"
+	"reflect"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
 	"strconv"
 )
 
+var OutputJson bool
 var quaxCmd = &cobra.Command{
 	Use:   "quax",
 	Short: "Query the accessibility tree of the current element",
@@ -49,7 +51,6 @@ var quaxCmd = &cobra.Command{
 				continue
 			}
 			if Verbose {
-				// TODO: please also output the go type of the two ID vars
 				fmt.Println("Node ID:", node.NodeID, "Type:", reflect.TypeOf(node.NodeID))
 				fmt.Println("Backend DOM Node ID:", node.BackendDOMNodeID, "Type:", reflect.TypeOf(node.BackendDOMNodeID))
 				fmt.Println("Role:", node.Role.Value)
@@ -82,7 +83,7 @@ var quaxCmd = &cobra.Command{
 				}
 			}
 		}
-		if Verbose {
+		if OutputJson {
 			// debug: print the tree as json
 			treeJSON, err := json.MarshalIndent(queryAXTree, "", "  ")
 			if err != nil {
@@ -110,12 +111,23 @@ var pickCmd = &cobra.Command{
 				return
 			}
 			fmt.Println("Picking node with ID:", nodeID)
-			// Set CurrentElement to the node that corresponds to this id
-			CurrentElement, err = Page.ElementFromNode(&proto.DOMNode{NodeID: proto.DOMNodeID(nodeID)})
+			// TODO: we need to cast the nodeID from int to proto.DOMBackendNodeID 
+	obj, err := proto.DOMResolveNode{
+		BackendNodeID: nodeID,
+	}.Call(Page)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	CurrentElement, err = Page.ElementFromObject(obj.Object)
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
+
+			// Set CurrentElement to the node that corresponds to this id
+			// CurrentElement, err = Page.ElementFromNode(&proto.DOMNode{NodeID: proto.DOMNodeID(nodeID)})
 		} else {
 			fmt.Println("Please provide a node ID")
 		}
