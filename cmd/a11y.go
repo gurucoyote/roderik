@@ -113,7 +113,7 @@ var pickCmd = &cobra.Command{
 			fmt.Println("Picking node with ID:", nodeID)
 			// TODO: we need to cast the nodeID from int to proto.DOMBackendNodeID 
 	obj, err := proto.DOMResolveNode{
-		BackendNodeID: nodeID,
+		BackendNodeID: proto.DOMBackendNodeID(nodeID),
 	}.Call(Page)
 	if err != nil {
 		fmt.Println(err)
