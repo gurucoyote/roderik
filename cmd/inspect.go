@@ -63,8 +63,26 @@ var HtmlCmd = &cobra.Command{
 	},
 }
 
+var DescribeCmd = &cobra.Command{
+	Use:   "describe",
+	Short: "Describe the current element as a JSON string",
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		// Get the element's properties
+		elementProperties, err := CurrentElement.Describe(0, false) // depth:0, pierce:false
+		if err != nil {
+			fmt.Println("Error describing element:", err)
+			return
+		}
+		fmt.Println(elementProperties)
+	},
+}
+
 func init() {
 	RootCmd.AddCommand(BoxCmd)
 	RootCmd.AddCommand(TextCmd)
 	RootCmd.AddCommand(HtmlCmd)
+	RootCmd.AddCommand(DescribeCmd)
 }
