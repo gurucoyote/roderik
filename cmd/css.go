@@ -23,6 +23,13 @@ var ComputedStyleCmd = &cobra.Command{
 			return
 		}
 
+		// Enable the DOM agent
+		err = proto.DOMEnable{}.Call(Page)
+		if err != nil {
+			fmt.Println("Error enabling DOM agent:", err)
+			return
+		}
+
 		// Enable the CSS agent
 		err = proto.CSSEnable{}.Call(Page)
 		if err != nil {
