@@ -33,7 +33,6 @@ var ComputedStyleCmd = &cobra.Command{
 		return styleObject;
 	}`)
 		fmt.Println(PrettyFormat(styles))
-
 	},
 }
 
