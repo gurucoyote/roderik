@@ -88,18 +88,16 @@ var RootCmd = &cobra.Command{
 			return
 		}
 
-		info := Page.MustInfo()
-		fmt.Println("Opened URL:", info.URL, info.Title)
 		headings, _ := Page.Elements("h1, h2, h3, h4, h5, h6")
 		if len(headings) > 0 {
 			CurrentElement = headings[0]
 		} else {
-			CurrentElement = Page.MustElement("body")
+			CurrentElement, err = Page.Element("body")
+			if err != nil {
+				fmt.Println("Page seems to have no body: ", err)
+				return
+			}
 		}
-		// Report on the headings
-		reportOnHeadings(Page)
-		// simple test for console output
-		// Page.MustEval(`() => console.log("hello world")`)
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 		// This function will always be run after any command (including sub-commands) is executed
@@ -199,26 +197,6 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	Page.WaitLoad()
 	return Page, nil
 }
-func reportOnHeadings(Page *rod.Page) {
-	// Get all headings
-	headings := Page.MustElements("h1, h2, h3, h4, h5, h6")
-	// Print the count of headings
-	fmt.Println("Count of headings:", len(headings))
-
-	// Output the description and font-family of the first heading element
-	if len(headings) > 0 {
-		firstHeading := headings[0]
-		fontFamily := firstHeading.MustEval(`() => getComputedStyle(this).fontFamily`).String()
-		fmt.Println("Font Family of the first heading:", fontFamily)
-		CurrentElement = firstHeading
-		/*
-			computedStyles := firstHeading.MustEval(`() => getComputedStyle(this)`)
-			fmt.Println("computed styles", PrettyFormat(computedStyles))
-			// description := firstHeading.MustDescribe()
-			// fmt.Println("Description: ", PrettyFormat(description))
-		*/
-	}
-}
 
 // PrettyFormat function
 func PrettyFormat(v interface{}) string {
@@ -239,7 +217,7 @@ func ReportElement(el *rod.Element) {
 	text := el.MustText()
 
 	// Limit the text to maxChars characters
-	limitedText := fmt.Sprintf("%.100s", text)
+	limitedText := fmt.Sprintf("%.50s", text)
 
 	fmt.Printf("%s, %d children, %s\n", tagName, childrenCount, limitedText)
 }

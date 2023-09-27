@@ -60,11 +60,15 @@ var HeadCmd = &cobra.Command{
 		if len(args) > 0 {
 			selector = fmt.Sprintf("h%s", args[0])
 		}
-		headings := Page.MustElements(selector)
+		headings, err := Page.Elements(selector)
+		if err != nil {
+			fmt.Println("couldn't find any heading of type ", selector, err)
+			return
+		}
 		if len(headings) > 0 {
 			CurrentElement = headings[0]
-			ReportElement(CurrentElement)
 		}
+		ReportElement(CurrentElement)
 	},
 }
 

@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"fmt"
 	"encoding/json"
-	"reflect"
+	"fmt"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
+	"reflect"
 	"strconv"
 )
 
@@ -65,9 +65,8 @@ var quaxCmd = &cobra.Command{
 				case "LineBreak":
 				case "generic":
 				case "paragraph":
-					fmt.Print("\n")
-					fmt.Println(node.Name.Value)
-				case "seperator":
+					fmt.Println("\n", node.Name.Value)
+				case "separator":
 					fmt.Println("---")
 				case "listitem":
 					fmt.Print("- ")
@@ -110,24 +109,20 @@ var pickCmd = &cobra.Command{
 				fmt.Println("Error converting node ID to integer:", err)
 				return
 			}
-			fmt.Println("Picking node with ID:", nodeID)
-			// TODO: we need to cast the nodeID from int to proto.DOMBackendNodeID 
-	obj, err := proto.DOMResolveNode{
-		BackendNodeID: proto.DOMBackendNodeID(nodeID),
-	}.Call(Page)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	CurrentElement, err = Page.ElementFromObject(obj.Object)
+			obj, err := proto.DOMResolveNode{
+				BackendNodeID: proto.DOMBackendNodeID(nodeID),
+			}.Call(Page)
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
 
-			// Set CurrentElement to the node that corresponds to this id
-			// CurrentElement, err = Page.ElementFromNode(&proto.DOMNode{NodeID: proto.DOMNodeID(nodeID)})
+			CurrentElement, err = Page.ElementFromObject(obj.Object)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			ReportElement(CurrentElement)
 		} else {
 			fmt.Println("Please provide a node ID")
 		}
