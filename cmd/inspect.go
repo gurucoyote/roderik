@@ -72,7 +72,7 @@ var DescribeCmd = &cobra.Command{
 			return
 		}
 		// Get the element's properties
-		elementProperties, err := CurrentElement.Describe(0, false) // depth:0, pierce:false
+		elementProperties, err := CurrentElement.Describe(0, true) // depth:0, pierce:false
 		if err != nil {
 			fmt.Println("Error describing element:", err)
 			return
