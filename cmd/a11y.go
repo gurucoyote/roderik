@@ -70,8 +70,13 @@ var quaxCmd = &cobra.Command{
 					fmt.Println("---")
 				case "listitem":
 					fmt.Print("- ")
-				case "link", "button", "textbox":
+				case "link":
 					fmt.Print(node.Role.Value.String(), "(", node.BackendDOMNodeID, ") ")
+				case "button", "textbox":
+					fmt.Print(node.Role.Value.String(), "(", node.BackendDOMNodeID, ") ")
+					fmt.Println(node.Name.Value)
+				case "LabelText":
+					fmt.Print("Label: ")
 				case "StaticText":
 					fmt.Println(node.Name.Value)
 				default:
@@ -100,8 +105,9 @@ func init() {
 }
 
 var pickCmd = &cobra.Command{
-	Use:   "pick",
-	Short: "Pick a node by its id",
+	Use:     "pick",
+	Aliases: []string{"id", "pickid"},
+	Short:   "Pick a node by its id",
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
 			nodeID, err := strconv.Atoi(args[0])

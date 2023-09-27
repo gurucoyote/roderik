@@ -106,14 +106,6 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	// Sub commands removed
-	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
-	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
-	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose mode")
-
-	RootCmd.AddCommand(ClearCmd)
-}
 func PrepareBrowser() (*rod.Browser, error) {
 	// Ensure user data directory exists
 	userDataDir := filepath.Join(".", "user_data")
@@ -235,6 +227,7 @@ func Box(el *rod.Element) error {
 	fmt.Println("box: ", PrettyFormat(box))
 	return nil
 }
+
 var ClearCmd = &cobra.Command{
 	Use:     "clear",
 	Aliases: []string{"cls"},
@@ -265,7 +258,6 @@ var ExitCmd = &cobra.Command{
 }
 
 func init() {
-	// Sub commands removed
 	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
 	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
 	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose mode")

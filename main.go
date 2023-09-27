@@ -20,11 +20,6 @@ func main() {
 		defer rl.Close()
 		for {
 			input, _ := rl.Readline()
-			if input == "exit" {
-				fmt.Println("Goodbye")
-				break
-			}
-
 			args := strings.Fields(input)
 			cmd.RootCmd.SetArgs(args)
 			cmd.RootCmd.Execute()
