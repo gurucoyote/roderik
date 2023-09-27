@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
 	"strconv"
@@ -76,8 +77,13 @@ var DescribeCmd = &cobra.Command{
 			fmt.Println("Error describing element:", err)
 			return
 		}
-		// TODO: output as JSON indented  string
-		fmt.Println(elementProperties)
+		// Convert elementProperties to a JSON string with indentation
+		jsonString, err := json.MarshalIndent(elementProperties, "", "  ")
+		if err != nil {
+			fmt.Println("Error converting to JSON:", err)
+			return
+		}
+		fmt.Println(string(jsonString))
 	},
 }
 
