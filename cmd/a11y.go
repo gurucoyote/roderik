@@ -49,10 +49,10 @@ var quaxCmd = &cobra.Command{
 				continue
 			}
 			if Verbose {
-				// Relevant info: computed string as text, source, number of children, ids and role
+				// TODO: please also output the go type of the two ID vars
 				fmt.Println("Node ID:", node.NodeID)
-				fmt.Println("Role:", node.Role.Value)
 				fmt.Println("Backend DOM Node ID:", node.BackendDOMNodeID)
+				fmt.Println("Role:", node.Role.Value)
 				fmt.Println("Parent ID:", node.ParentID)
 				if node.Name != nil {
 					fmt.Println("Name:", node.Name.Value)
