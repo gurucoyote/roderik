@@ -23,6 +23,13 @@ var ComputedStyleCmd = &cobra.Command{
 			return
 		}
 
+		// Enable the CSS agent
+		err = proto.CSSEnable{}.Call(Page)
+		if err != nil {
+			fmt.Println("Error enabling CSS agent:", err)
+			return
+		}
+
 		// Call the CSSGetComputedStyleForNode function
 		computedStyle, err := proto.CSSGetComputedStyleForNode{
 			NodeID: elementProperties.NodeID,
