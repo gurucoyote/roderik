@@ -76,6 +76,7 @@ var DescribeCmd = &cobra.Command{
 			fmt.Println("Error describing element:", err)
 			return
 		}
+		// TODO: output as JSON indented  string
 		fmt.Println(elementProperties)
 	},
 }
