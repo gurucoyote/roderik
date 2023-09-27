@@ -109,6 +109,8 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
 	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
 	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose mode")
+
+	RootCmd.AddCommand(ClearCmd)
 }
 func PrepareBrowser() (*rod.Browser, error) {
 	// Ensure user data directory exists
@@ -230,4 +232,21 @@ func Box(el *rod.Element) error {
 	box := shape.Box()
 	fmt.Println("box: ", PrettyFormat(box))
 	return nil
+}
+var ClearCmd = &cobra.Command{
+	Use:     "clear",
+	Aliases: []string{"cls"},
+	Short:   "Clear the terminal screen",
+	Long:    `This command will clear the terminal screen.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if runtime.GOOS == "windows" {
+			cmd := exec.Command("cmd", "/c", "cls")
+			cmd.Stdout = os.Stdout
+			cmd.Run()
+		} else {
+			cmd := exec.Command("clear")
+			cmd.Stdout = os.Stdout
+			cmd.Run()
+		}
+	},
 }
