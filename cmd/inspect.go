@@ -87,9 +87,26 @@ var DescribeCmd = &cobra.Command{
 	},
 }
 
+var XPathCmd = &cobra.Command{
+	Use:   "xpath",
+	Short: "Get the optimized xpath of the current element",
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		xpath, err := CurrentElement.GetXPath(true) // true for optimized xpath
+		if err != nil {
+			fmt.Println("Error getting xpath:", err)
+			return
+		}
+		fmt.Println(xpath)
+	},
+}
+
 func init() {
 	RootCmd.AddCommand(BoxCmd)
 	RootCmd.AddCommand(TextCmd)
 	RootCmd.AddCommand(HtmlCmd)
 	RootCmd.AddCommand(DescribeCmd)
+	RootCmd.AddCommand(XPathCmd)
 }
