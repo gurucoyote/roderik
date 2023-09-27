@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"encoding/json"
+	// "encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/go-rod/rod/lib/proto"
+	// "github.com/go-rod/rod/lib/proto"
 )
 
 var ComputedStyleCmd = &cobra.Command{
@@ -15,44 +15,25 @@ var ComputedStyleCmd = &cobra.Command{
 			fmt.Println("No current element selected.")
 			return
 		}
-
-		// Get the element's properties
-		elementProperties, err := CurrentElement.Describe(0, false) // depth:0, pierce:false
-		if err != nil {
-			fmt.Println("Error describing element:", err)
-			return
+		// Evaluate JavaScript code to get the computed styles of the element
+		// Print the computed styles
+		styles := CurrentElement.MustEval(`() => {
+		// Get the computed style for the element
+		var style = window.getComputedStyle(this);
+		var styleObject = {};
+		// Iterate over each style
+		for (var i = 0; i < style.length; i++) {
+			var prop = style[i];
+			var value = style.getPropertyValue(prop);
+			// Only add the style to the object if it has a value
+			if (value) {
+				styleObject[prop] = value;
+			}
 		}
+		return styleObject;
+	}`)
+		fmt.Println(PrettyFormat(styles))
 
-		// Enable the DOM agent
-		err = proto.DOMEnable{}.Call(Page)
-		if err != nil {
-			fmt.Println("Error enabling DOM agent:", err)
-			return
-		}
-
-		// Enable the CSS agent
-		err = proto.CSSEnable{}.Call(Page)
-		if err != nil {
-			fmt.Println("Error enabling CSS agent:", err)
-			return
-		}
-
-		// Call the CSSGetComputedStyleForNode function
-		computedStyle, err := proto.CSSGetComputedStyleForNode{
-			NodeID: elementProperties.NodeID,
-		}.Call(Page)
-		if err != nil {
-			fmt.Println("Error getting computed styles:", err)
-			return
-		}
-
-		// Output the result as a JSON string
-		computedStyleJSON, err := json.MarshalIndent(computedStyle, "", "  ")
-		if err != nil {
-			fmt.Println("Error converting computed styles to JSON:", err)
-			return
-		}
-		fmt.Println(string(computedStyleJSON))
 	},
 }
 
