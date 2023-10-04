@@ -246,6 +246,21 @@ var ClearCmd = &cobra.Command{
 	},
 }
 
+var ReloadCmd = &cobra.Command{
+	Use:   "reload",
+	Short: "Reload the current page",
+	Long:  `This command will reload the current page.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		currentURL := Page.MustInfo().URL
+		_, err := LoadURL(currentURL)
+		if err != nil {
+			fmt.Println("Error reloading URL:", err)
+			return
+		}
+		fmt.Println("Page reloaded successfully.")
+	},
+}
+
 var ExitCmd = &cobra.Command{
 	Use:     "exit",
 	Aliases: []string{"q", "Q", "bye"},
@@ -264,4 +279,5 @@ func init() {
 
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)
+	RootCmd.AddCommand(ReloadCmd)
 }
