@@ -6,13 +6,19 @@
            display: flex;
            justify-content: space-evenly;
            width: 100%;
+           margin-left: -10px;
+           margin-right: -10px;
+       }
+       .image-container img {
+           margin-left: 10px;
+           margin-right: 10px;
        }
        .image-container.three img {
-           width: 33.33%;
+           width: calc(33.33% - 20px);
            height: auto;
        }
        .image-container.four img {
-           width: 25%;
+           width: calc(25% - 20px);
            height: auto;
        }
    </style>
