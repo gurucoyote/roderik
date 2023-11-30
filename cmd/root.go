@@ -122,7 +122,7 @@ func PrepareBrowser() (*rod.Browser, error) {
 	if !found {
 		return nil, fmt.Errorf("browser executable path not found")
 	}
-	u := launcher.New().Bin(path).
+	controlURL := launcher.New().Bin(path).
 		Set("disable-web-security").
 		Set("disable-setuid-sandbox").
 		Set("no-sandbox").
@@ -130,10 +130,10 @@ func PrepareBrowser() (*rod.Browser, error) {
 		Set("disable-gpu").
 		Set("user-data-dir", userDataDir)
 	if IgnoreCertErrors {
-		u.Set("ignore-certificate-errors") // Set the flag to ignore certificate errors if specified
+		controlURL.Set("ignore-certificate-errors") // Set the flag to ignore certificate errors if specified
 	}
-	u = u.Headless(true).MustLaunch()
-	browser := rod.New().ControlURL(u).MustConnect()
+	controlURL = controlURL.Headless(true).MustLaunch()
+	browser := rod.New().ControlURL(controlURL).MustConnect()
 
 	return browser, nil
 }
