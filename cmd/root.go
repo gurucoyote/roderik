@@ -37,6 +37,7 @@ func AskForConfirmation(prompt string) bool {
 var ShowNetActivity bool
 var Interactive bool
 var Verbose bool
+var IgnoreCertErrors bool // New flag for ignoring certificate errors
 
 type EventLog struct {
 	mu   sync.Mutex
@@ -127,8 +128,11 @@ func PrepareBrowser() (*rod.Browser, error) {
 		Set("no-sandbox").
 		Set("no-first-run", "true").
 		Set("disable-gpu").
-		Set("user-data-dir", userDataDir).
-		Headless(true).MustLaunch()
+		Set("user-data-dir", userDataDir)
+	if IgnoreCertErrors {
+		u.Set("ignore-certificate-errors") // Set the flag to ignore certificate errors if specified
+	}
+	u = u.Headless(true).MustLaunch()
 	browser := rod.New().ControlURL(u).MustConnect()
 
 	return browser, nil
@@ -276,6 +280,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
 	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
 	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose mode")
+	RootCmd.PersistentFlags().BoolVarP(&IgnoreCertErrors, "ignore-cert-errors", "k", false, "Ignore certificate errors") // Register the new flag
 
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)
