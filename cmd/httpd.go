@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/base64"
 	"fmt"
+	"os"
 	"github.com/spf13/cobra"
 	"net/http"
 	"strings"
@@ -11,13 +12,18 @@ import (
 var (
 	port      int
 	basicAuth bool
+	staticDir string
 )
 
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Start a simple static file server",
 	Run: func(cmd *cobra.Command, args []string) {
-		fs := http.FileServer(http.Dir("assets/"))
+		dir := staticDir
+		if len(args) > 0 {
+			dir = args[0]
+		}
+		fs := http.FileServer(http.Dir(dir))
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if basicAuth {
 				auth := r.Header.Get("Authorization")
@@ -54,5 +60,6 @@ var serverCmd = &cobra.Command{
 func init() {
 	serverCmd.Flags().IntVarP(&port, "port", "p", 80, "Port to run the server on")
 	serverCmd.Flags().BoolVarP(&basicAuth, "basic-auth", "a", false, "Require basic auth")
+	serverCmd.Flags().StringVarP(&staticDir, "dir", "d", "assets/", "Directory to serve static content from")
 	RootCmd.AddCommand(serverCmd)
 }
