@@ -151,14 +151,14 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	go Page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
 		msg := fmt.Sprintf("Request sent: %s", e.Request.URL)
 		if ShowNetActivity {
-			fmt.Printf(msg)
+			fmt.Println(msg)
 		}
 		eventLog.Add(msg)
 	})()
 	go Page.EachEvent(func(e *proto.NetworkResponseReceived) {
 		msg := fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status)
 		if ShowNetActivity {
-			fmt.Printf(msg)
+			fmt.Println(msg)
 		}
 		eventLog.Add(msg)
 	})()
