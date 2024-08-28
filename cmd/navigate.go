@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+
+	"github.com/go-rod/rod"
 	"github.com/spf13/cobra"
 )
 
