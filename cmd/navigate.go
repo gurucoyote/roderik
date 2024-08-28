@@ -6,6 +6,9 @@ import (
 )
 
 func init() {
+	RootCmd.AddCommand(SearchCmd)
+	RootCmd.AddCommand(FirstCmd)
+	RootCmd.AddCommand(LastCmd)
 	RootCmd.AddCommand(NextCmd)
 	RootCmd.AddCommand(PrevCmd)
 	RootCmd.AddCommand(WalkCmd)
@@ -72,8 +75,60 @@ var HeadCmd = &cobra.Command{
 	},
 }
 
-type Element struct {
-	// Define the fields of the Element struct here
+var elementList []*rod.Element
+var currentIndex int
+
+var SearchCmd = &cobra.Command{
+	Use:   "search [selector]",
+	Short: "Search for elements matching the CSS selector and build an internal list",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		selector := args[0]
+		elements, err := Page.Elements(selector)
+		if err != nil {
+			fmt.Println("Error searching for elements:", err)
+			return
+		}
+		elementList = elements
+		if len(elementList) > 0 {
+			currentIndex = 0
+			CurrentElement = elementList[currentIndex]
+			fmt.Println("Found elements. Navigated to the first element.")
+			ReportElement(CurrentElement)
+		} else {
+			fmt.Println("No elements found.")
+		}
+	},
+}
+
+var FirstCmd = &cobra.Command{
+	Use:   "first",
+	Short: "Navigate to the first element in the list",
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(elementList) == 0 {
+			fmt.Println("Element list is empty. Please perform a search first.")
+			return
+		}
+		currentIndex = 0
+		CurrentElement = elementList[currentIndex]
+		fmt.Println("Navigated to the first element.")
+		ReportElement(CurrentElement)
+	},
+}
+
+var LastCmd = &cobra.Command{
+	Use:   "last",
+	Short: "Navigate to the last element in the list",
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(elementList) == 0 {
+			fmt.Println("Element list is empty. Please perform a search first.")
+			return
+		}
+		currentIndex = len(elementList) - 1
+		CurrentElement = elementList[currentIndex]
+		fmt.Println("Navigated to the last element.")
+		ReportElement(CurrentElement)
+	},
 }
 
 var NextCmd = &cobra.Command{
