@@ -133,31 +133,58 @@ var LastCmd = &cobra.Command{
 	},
 }
 
-var NsCmd = &cobra.Command{
-	Use:   "ns [selector]",
-	Short: "Navigate to the next element",
-	Args:  cobra.MaximumNArgs(1),
+var NextCmd = &cobra.Command{
+	Use:   "next",
+	Short: "Navigate to the next element in the list",
 	Run: func(cmd *cobra.Command, args []string) {
-		if !hasCurrentElement() {
+		if len(elementList) == 0 {
+			fmt.Println("Element list is empty. Please perform a search first.")
 			return
 		}
-		// ReportElement(CurrentElement)
-		nextElement, err := CurrentElement.Next()
-		if err != nil {
-			fmt.Println("Error navigating to the next element:", err)
-			return
+		if currentIndex < len(elementList)-1 {
+			currentIndex++
+			CurrentElement = elementList[currentIndex]
+			fmt.Println("Navigated to the next element.")
+			ReportElement(CurrentElement)
+		} else {
+			fmt.Println("Already at the last element.")
 		}
-		CurrentElement = nextElement
-		ReportElement(nextElement)
 	},
 }
 
-func hasCurrentElement() bool {
-	if CurrentElement == nil {
-		fmt.Println("Error: CurrentElement is not defined. Please load a page or navigate to an element first.")
-		return false
-	}
-	return true
+var PrevCmd = &cobra.Command{
+	Use:   "prev",
+	Short: "Navigate to the previous element in the list",
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(elementList) == 0 {
+			fmt.Println("Element list is empty. Please perform a search first.")
+			return
+		}
+		if currentIndex > 0 {
+			currentIndex--
+			CurrentElement = elementList[currentIndex]
+			fmt.Println("Navigated to the previous element.")
+			ReportElement(CurrentElement)
+		} else {
+			fmt.Println("Already at the first element.")
+		}
+	},
+}
+
+func init() {
+	RootCmd.AddCommand(SearchCmd)
+	RootCmd.AddCommand(FirstCmd)
+	RootCmd.AddCommand(LastCmd)
+	RootCmd.AddCommand(NsCmd)
+	RootCmd.AddCommand(PsCmd)
+	RootCmd.AddCommand(WalkCmd)
+	RootCmd.AddCommand(ParentCmd)
+	RootCmd.AddCommand(ChildCmd)
+	RootCmd.AddCommand(HeadCmd)
+	RootCmd.AddCommand(BodyCmd)
+	RootCmd.AddCommand(ElemCmd)
+	RootCmd.AddCommand(NextCmd)
+	RootCmd.AddCommand(PrevCmd)
 }
 
 var WalkCmd = &cobra.Command{
