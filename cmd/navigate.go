@@ -11,8 +11,8 @@ func init() {
 	RootCmd.AddCommand(SearchCmd)
 	RootCmd.AddCommand(FirstCmd)
 	RootCmd.AddCommand(LastCmd)
-	RootCmd.AddCommand(NextCmd)
-	RootCmd.AddCommand(PrevCmd)
+	RootCmd.AddCommand(NsCmd)
+	RootCmd.AddCommand(PsCmd)
 	RootCmd.AddCommand(WalkCmd)
 	RootCmd.AddCommand(ParentCmd)
 	RootCmd.AddCommand(ChildCmd)
@@ -133,8 +133,8 @@ var LastCmd = &cobra.Command{
 	},
 }
 
-var NextCmd = &cobra.Command{
-	Use:   "next [selector]",
+var NsCmd = &cobra.Command{
+	Use:   "ns [selector]",
 	Short: "Navigate to the next element",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -171,11 +171,11 @@ var WalkCmd = &cobra.Command{
 		if steps < 0 {
 			steps = -steps
 			for i := 0; i < steps; i++ {
-				PrevCmd.Run(cmd, []string{})
+				PsCmd.Run(cmd, []string{})
 			}
 		} else {
 			for i := 0; i < steps; i++ {
-				NextCmd.Run(cmd, []string{})
+				NsCmd.Run(cmd, []string{})
 			}
 		}
 	},
@@ -185,8 +185,8 @@ func init() {
 	WalkCmd.Flags().Int("steps", 4, "Number of steps to walk")
 }
 
-var PrevCmd = &cobra.Command{
-	Use:   "prev",
+var PsCmd = &cobra.Command{
+	Use:   "ps",
 	Short: "Navigate to the previous element",
 	Run: func(cmd *cobra.Command, args []string) {
 		if !hasCurrentElement() {
