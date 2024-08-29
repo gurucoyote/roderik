@@ -21,6 +21,14 @@ func init() {
 	RootCmd.AddCommand(ElemCmd)
 }
 
+func hasCurrentElement() bool {
+	if CurrentElement == nil {
+		fmt.Println("Error: CurrentElement is not defined. Please load a page or navigate to an element first.")
+		return false
+	}
+	return true
+}
+
 var ElemCmd = &cobra.Command{
 	Use:   "elem [selector]",
 	Short: "Navigate to the first element that matches the CSS selector",
@@ -152,6 +160,23 @@ var NextCmd = &cobra.Command{
 	},
 }
 
+var NsCmd = &cobra.Command{
+	Use:   "ns",
+	Short: "Navigate to the next sibling element",
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		// ReportElement(CurrentElement)
+		nextElement, err := CurrentElement.Next()
+		if err != nil {
+			fmt.Println("Error navigating to the next element:", err)
+			return
+		}
+		CurrentElement = nextElement
+		ReportElement(nextElement)
+	},
+}
 var PrevCmd = &cobra.Command{
 	Use:   "prev",
 	Short: "Navigate to the previous element in the list",
@@ -168,6 +193,22 @@ var PrevCmd = &cobra.Command{
 		} else {
 			fmt.Println("Already at the first element.")
 		}
+	},
+}
+var PsCmd = &cobra.Command{
+	Use:   "ps",
+	Short: "Navigate to the previous sibling element",
+	Run: func(cmd *cobra.Command, args []string) {
+		if !hasCurrentElement() {
+			return
+		}
+		prevElement, err := CurrentElement.Previous()
+		if err != nil {
+			fmt.Println("Error navigating to the previous element:", err)
+			return
+		}
+		CurrentElement = prevElement
+		ReportElement(prevElement)
 	},
 }
 
@@ -210,23 +251,6 @@ var WalkCmd = &cobra.Command{
 
 func init() {
 	WalkCmd.Flags().Int("steps", 4, "Number of steps to walk")
-}
-
-var PsCmd = &cobra.Command{
-	Use:   "ps",
-	Short: "Navigate to the previous element",
-	Run: func(cmd *cobra.Command, args []string) {
-		if !hasCurrentElement() {
-			return
-		}
-		prevElement, err := CurrentElement.Previous()
-		if err != nil {
-			fmt.Println("Error navigating to the previous element:", err)
-			return
-		}
-		CurrentElement = prevElement
-		ReportElement(prevElement)
-	},
 }
 
 var ChildCmd = &cobra.Command{
