@@ -44,6 +44,15 @@ var quaxCmd = &cobra.Command{
 			fmt.Println("Error querying accessibility tree:", err)
 			return
 		}
+		if OutputJson {
+			// debug: print the tree as json
+			treeJSON, err := json.MarshalIndent(queryAXTree, "", "  ")
+			if err != nil {
+				fmt.Println("Error converting node to JSON:", err)
+				return
+			}
+			fmt.Println(string(treeJSON))
+		} else {
 		// Iterate over the Nodes of the queried tree and output relevant info
 		for _, node := range queryAXTree.Nodes {
 			// Filter out any nodes that have ignore set to true
@@ -58,8 +67,8 @@ var quaxCmd = &cobra.Command{
 				if node.Name != nil {
 					fmt.Println("Name:", node.Name.Value)
 				}
-				fmt.Println("Number of children:", len(node.ChildIds))
-				fmt.Println("Child IDs:", node.ChildIds)
+				fmt.Println("Number of children:", len(node.ChildIDs))
+				fmt.Println("Child IDs:", node.ChildIDs)
 			} else {
 				switch node.Role.Value.String() {
 				case "LineBreak":
@@ -87,15 +96,7 @@ var quaxCmd = &cobra.Command{
 				}
 			}
 		}
-		if OutputJson {
-			// debug: print the tree as json
-			treeJSON, err := json.MarshalIndent(queryAXTree, "", "  ")
-			if err != nil {
-				fmt.Println("Error converting node to JSON:", err)
-				return
-			}
-			fmt.Println(string(treeJSON))
-		}
+	}
 	},
 }
 
