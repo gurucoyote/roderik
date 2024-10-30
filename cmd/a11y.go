@@ -101,7 +101,8 @@ var quaxCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(quaxCmd)
+	quaxCmd.Flags().BoolVarP(&OutputJson, "json", "j", false, "Output JSON format")
+    RootCmd.AddCommand(quaxCmd)
 	RootCmd.AddCommand(pickCmd)
 }
 
