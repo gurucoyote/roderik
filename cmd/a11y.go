@@ -53,56 +53,57 @@ var quaxCmd = &cobra.Command{
 			}
 			fmt.Println(string(treeJSON))
 		} else {
-		// Iterate over the Nodes of the queried tree and output relevant info
-		for _, node := range queryAXTree.Nodes {
-			// Filter out any nodes that have ignore set to true
-			if node.Ignored {
-				continue
-			}
-			if Verbose {
-				fmt.Println("Node ID:", node.NodeID, "Type:", reflect.TypeOf(node.NodeID))
-				fmt.Println("Backend DOM Node ID:", node.BackendDOMNodeID, "Type:", reflect.TypeOf(node.BackendDOMNodeID))
-				fmt.Println("Role:", node.Role.Value)
-				fmt.Println("Parent ID:", node.ParentID)
-				if node.Name != nil {
-					fmt.Println("Name:", node.Name.Value)
+			// Iterate over the Nodes of the queried tree and output relevant info
+			for _, node := range queryAXTree.Nodes {
+				// Filter out any nodes that have ignore set to true
+				if node.Ignored {
+					continue
 				}
-				fmt.Println("Number of children:", len(node.ChildIDs))
-				fmt.Println("Child IDs:", node.ChildIDs)
-			} else {
-				switch node.Role.Value.String() {
-				case "LineBreak":
-				case "generic":
-				case "paragraph":
-					fmt.Println("\n", node.Name.Value)
-				case "separator":
-					fmt.Println("---")
-				case "listitem":
-					fmt.Print("- ")
-				case "link":
-					fmt.Print(node.Role.Value.String(), "(", node.BackendDOMNodeID, ") ")
-				case "button", "textbox":
-					fmt.Print(node.Role.Value.String(), "(", node.BackendDOMNodeID, ") ")
-					fmt.Println(node.Name.Value)
-				case "LabelText":
-					fmt.Print("Label: ")
-				case "StaticText":
-					fmt.Println(node.Name.Value)
-				default:
-					fmt.Print(node.Role.Value.String(), ": ")
-					fmt.Println(node.Name.Value)
-				}
-				if node.Name != nil {
+				if Verbose {
+					fmt.Println("Node ID:", node.NodeID, "Type:", reflect.TypeOf(node.NodeID))
+					fmt.Println("Backend DOM Node ID:", node.BackendDOMNodeID, "Type:", reflect.TypeOf(node.BackendDOMNodeID))
+					fmt.Println("Role:", node.Role.Value)
+					fmt.Println("Parent ID:", node.ParentID)
+					if node.Name != nil {
+						fmt.Println("Name:", node.Name.Value)
+					}
+					fmt.Println("Number of children:", len(node.ChildIDs))
+					fmt.Println("Child IDs:", node.ChildIDs)
+				} else {
+					switch node.Role.Value.String() {
+					case "LineBreak":
+					case "generic":
+					case "InlineTextBox":
+					case "paragraph":
+						fmt.Println("\n", node.Name.Value)
+					case "separator":
+						fmt.Println("---")
+					case "listitem":
+						fmt.Print("- ")
+					case "link":
+						fmt.Print(node.Role.Value.String(), "(", node.BackendDOMNodeID, ") ")
+					case "button", "textbox":
+						fmt.Print(node.Role.Value.String(), "(", node.BackendDOMNodeID, ") ")
+						fmt.Println(node.Name.Value)
+					case "LabelText":
+						fmt.Print("Label: ")
+					case "StaticText":
+						fmt.Println(node.Name.Value)
+					default:
+						fmt.Print(node.Role.Value.String(), ": ")
+						// fmt.Println(node.Name.Value)
+					}
+					if node.Name != nil {
+					}
 				}
 			}
 		}
-	}
 	},
 }
 
 func init() {
 	quaxCmd.Flags().BoolVarP(&OutputJson, "json", "j", false, "Output JSON format")
-    RootCmd.AddCommand(quaxCmd)
+	RootCmd.AddCommand(quaxCmd)
 	RootCmd.AddCommand(pickCmd)
 }
 
