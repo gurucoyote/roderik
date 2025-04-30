@@ -2,10 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"log"
+	"os"
 
 	mcp "github.com/metoro-io/mcp-golang"
 	"github.com/metoro-io/mcp-golang/transport/stdio"
 	"github.com/spf13/cobra"
+)
+
+// path to the MCP debug log file, override with --log
+var mcpLogPath string
 )
 
 // LoadURLArgs is the JSON schema for the load_url tool.
@@ -25,72 +32,96 @@ var mcpCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(mcpCmd)
+	mcpCmd.Flags().StringVarP(&mcpLogPath, "log", "l", "roderik-mcp.log", "path to the MCP debug log file")
 }
 
 func runMCP(cmd *cobra.Command, args []string) {
+	// 0) open log file
+	f, err := os.OpenFile(mcpLogPath,
+		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cannot open mcp log %q: %v\n", mcpLogPath, err)
+	} else {
+		mw := io.MultiWriter(os.Stderr, f)
+		log.SetOutput(mw)
+		defer f.Close()
+	}
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.Printf("=== starting MCP server ===")
+
 	// 1) create the server over stdio
 	server := mcp.NewServer(stdio.NewStdioServerTransport())
 
-	// helper to panic on registration error
+	// helper to log and fatal on registration error
 	must := func(err error) {
 		if err != nil {
-			panic(err)
+			log.Fatalf("failed to register tool: %v", err)
 		}
 	}
 
-	// 2) register load_url
+	// 2) register load_url with logging
 	must(server.RegisterTool(
 		"load_url",
 		"Navigate the browser to the given URL",
 		func(a LoadURLArgs) (*mcp.ToolResponse, error) {
+			log.Printf("→ tool=load_url args=%+v", a)
 			page, err := LoadURL(a.URL)
 			if err != nil {
+				log.Printf("✗ load_url error: %v", err)
 				return nil, fmt.Errorf("load_url failed: %w", err)
 			}
-			// set the current element to <html>
 			CurrentElement = page.MustElement("html")
-			return mcp.NewToolResponse(
-				mcp.NewTextContent(fmt.Sprintf("navigated to %s", page.MustInfo().URL)),
-			), nil
+			msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
+			resp := mcp.NewToolResponse(mcp.NewTextContent(msg))
+			log.Printf("✓ load_url response=%q", msg)
+			return resp, nil
 		},
 	))
 
-	// 3) register get_html
+	// 3) register get_html with logging
 	must(server.RegisterTool(
 		"get_html",
 		"Return the HTML of the current page",
 		func(_ HTMLArgs) (*mcp.ToolResponse, error) {
+			log.Printf("→ tool=get_html")
 			if CurrentElement == nil {
-				return nil, fmt.Errorf("no page loaded – call load_url first")
+				err := fmt.Errorf("no page loaded – call load_url first")
+				log.Printf("✗ get_html error: %v", err)
+				return nil, err
 			}
 			html := CurrentElement.MustHTML()
-			return mcp.NewToolResponse(
-				mcp.NewTextContent(html),
-			), nil
+			resp := mcp.NewToolResponse(mcp.NewTextContent(html))
+			log.Printf("✓ get_html response length=%d", len(html))
+			return resp, nil
 		},
 	))
 
 	// 4) channel to signal shutdown
 	done := make(chan struct{})
 
-	// 5) start serving MCP requests in a goroutine
+	// 5) start serving MCP requests with logging
 	go func() {
+		log.Printf("server.Serve() starting…")
 		if err := server.Serve(); err != nil {
-			panic("mcp server error: " + err.Error())
+			log.Printf("server.Serve() error: %v", err)
+		} else {
+			log.Printf("server.Serve() exited cleanly")
 		}
 		close(done)
 	}()
 
-	// 6) register shutdown tool so clients can ask us to quit
+	// 6) register shutdown tool with logging
 	must(server.RegisterTool(
 		"shutdown",
 		"Gracefully shut down the MCP server",
 		func(_ struct{}) (*mcp.ToolResponse, error) {
+			log.Printf("→ tool=shutdown")
 			close(done)
 			return mcp.NewToolResponse(mcp.NewTextContent("shutting down")), nil
 		},
 	))
 
-	// 7) wait for either Serve() to exit or for the shutdown tool
+	// 7) wait for shutdown
 	<-done
+	log.Printf("=== MCP server exiting ===")
 }
