@@ -94,7 +94,6 @@ func runMCP(cmd *cobra.Command, args []string) {
 		} else {
 			log.Printf("server.Serve() exited cleanly")
 		}
-		close(done)
 	}()
 
 	// register shutdown tool
