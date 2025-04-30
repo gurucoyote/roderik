@@ -40,7 +40,6 @@ func runMCP(cmd *cobra.Command, args []string) {
 	// FORCE the standard logger to stderr
 	log.SetOutput(os.Stderr)
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	log.Printf("=== starting MCP server ===")
 
 	// 0) open log file
 	f, err := os.OpenFile(mcpLogPath,
@@ -53,7 +52,6 @@ func runMCP(cmd *cobra.Command, args []string) {
 		defer f.Close()
 	}
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	log.Printf("=== starting MCP server ===")
 
 	// 1) create the server over stdio
 	server := NewServer(os.Stdin, os.Stdout)
