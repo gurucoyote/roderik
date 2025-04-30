@@ -70,8 +70,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	))
 
-	// 4) start serving MCP requests (this will block)
-	if err := server.Serve(); err != nil {
-		panic(err)
-	}
+	// 4) start serving MCP requests in a goroutine
+	go func() {
+		if err := server.Serve(); err != nil {
+			panic("mcp server error: " + err.Error())
+		}
+	}()
+	// 5) block forever (so we do not return / exit)
+	select {}
 }
