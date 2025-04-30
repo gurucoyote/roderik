@@ -20,7 +20,7 @@ import (
 
 func GetUserInput(prompt string) string {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print(prompt)
+	fmt.Fprint(os.Stderr, prompt)
 	text, _ := reader.ReadString('\n')
 	return text
 }
@@ -151,20 +151,20 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	go Page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
 		msg := fmt.Sprintf("Request sent: %s", e.Request.URL)
 		if ShowNetActivity {
-			fmt.Println(msg)
+			fmt.Fprintln(os.Stderr, msg)
 		}
 		eventLog.Add(msg)
 	})()
 	go Page.EachEvent(func(e *proto.NetworkResponseReceived) {
 		msg := fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status)
 		if ShowNetActivity {
-			fmt.Println(msg)
+			fmt.Fprintln(os.Stderr, msg)
 		}
 		eventLog.Add(msg)
 	})()
 	// setup event listener for navigate events
 	go Page.EachEvent(func(e *proto.PageFrameNavigated) {
-		fmt.Println("Navigated to: ", e.Frame.URL)
+		fmt.Fprintln(os.Stderr, "Navigated to:", e.Frame.URL)
 		CurrentElement = Page.MustElement("body")
 	})()
 	// setup event listener for dialogs
@@ -186,7 +186,7 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	// Listen for all events of console output.
 	if true {
 		go Page.EachEvent(func(e *proto.RuntimeConsoleAPICalled) {
-			fmt.Println("console: ", Page.MustObjectsToJSON(e.Args))
+			fmt.Fprintln(os.Stderr, "console:", Page.MustObjectsToJSON(e.Args))
 		})()
 	}
 

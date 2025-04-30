@@ -3,7 +3,7 @@ package cmd
 import (
 	"encoding/base64"
 	"fmt"
-	// "os"
+	"os"
 	"github.com/spf13/cobra"
 	"net/http"
 	"strings"
@@ -42,15 +42,15 @@ var serverCmd = &cobra.Command{
 				}
 			}
 
-			fmt.Println("Requested URI: ", r.RequestURI)
+			fmt.Fprintln(os.Stderr, "Requested URI:", r.RequestURI)
 			fs.ServeHTTP(w, r)
-			fmt.Println("Response status: ", w.Header().Get("Status"))
+			fmt.Fprintln(os.Stderr, "Response status:", w.Header().Get("Status"))
 		})
 
 		http.Handle("/", handler)
 
 		addr := fmt.Sprintf(":%d", port)
-		fmt.Printf("Starting server on %s\n", addr)
+		fmt.Fprintf(os.Stderr, "Starting server on %s\n", addr)
 		if err := http.ListenAndServe(addr, nil); err != nil {
 			panic(err)
 		}
