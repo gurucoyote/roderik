@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"github.com/spf13/cobra"
 
 	"github.com/spf13/cobra"
 )
@@ -31,9 +32,18 @@ var mcpCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(mcpCmd)
 	mcpCmd.Flags().StringVarP(&mcpLogPath, "log", "l", "roderik-mcp.log", "path to the MCP debug log file")
+
+	// ensure cobra’s own help/errors go to stderr
+	mcpCmd.SetOut(os.Stderr)
+	mcpCmd.SetErr(os.Stderr)
 }
 
 func runMCP(cmd *cobra.Command, args []string) {
+	// FORCE the standard logger to stderr
+	log.SetOutput(os.Stderr)
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.Printf("=== starting MCP server ===")
+
 	// 0) open log file
 	f, err := os.OpenFile(mcpLogPath,
 		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
