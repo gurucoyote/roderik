@@ -11,9 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// path to the MCP debug log file, override with --log
-var mcpLogPath string
-)
+–// path to the MCP debug log file, override with --log
+–var mcpLogPath string
++// path to the MCP debug log file, override with --log
++var mcpLogPath string
 
 // LoadURLArgs is the JSON schema for the load_url tool.
 type LoadURLArgs struct {
