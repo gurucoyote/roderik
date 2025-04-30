@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build the roderik binary
+# 1) make sure we're in the script's own directory
+SCRIPT_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+cd "$SCRIPT_DIR"
+
+# 2) build the binary
+echo "🛠 Building roderik…"
 go build -o roderik .
 
-# Write Inspector configuration
-cat << 'EOF' > inspector.config.json
+# 3) write out the Inspector config
+cat > inspector.config.json << 'EOF'
 {
   "mcpServers": {
     "roderik-mcp": {
@@ -16,6 +21,11 @@ cat << 'EOF' > inspector.config.json
   }
 }
 EOF
+echo "✔ inspector.config.json written:"
+cat inspector.config.json
 
-# Launch the Model Context Protocol Inspector
-npx @modelcontextprotocol/inspector --config=inspector.config.json --server=roderik-mcp
+# 4) launch the Inspector (telling it which server key to use)
+echo "🚀 Starting MCP Inspector…"
+npx @modelcontextprotocol/inspector \
+  --config=inspector.config.json \
+  --server=roderik-mcp
