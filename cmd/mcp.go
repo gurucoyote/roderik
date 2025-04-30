@@ -7,8 +7,6 @@ import (
 	"log"
 	"os"
 	"github.com/spf13/cobra"
-
-	"github.com/spf13/cobra"
 )
 
 // path to the MCP debug log file, override with --log
