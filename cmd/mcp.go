@@ -81,7 +81,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			log.Printf("✓ load_url response=%q", msg)
 			return resp, nil
 		},
-	))
+	)
 
 	// 3) register get_html with logging
 	server.RegisterTool(
@@ -99,7 +99,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			log.Printf("✓ get_html response length=%d", len(html))
 			return resp, nil
 		},
-	))
+	)
 
 	// 4) channel to signal shutdown
 	done := make(chan struct{})
@@ -124,7 +124,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			close(done)
 			return mcp.NewToolResponse(mcp.NewTextContent("shutting down")), nil
 		},
-	))
+	)
 
 	// 7) wait for shutdown
 	<-done
