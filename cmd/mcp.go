@@ -103,6 +103,13 @@ func runMCP(cmd *cobra.Command, args []string) {
 	// 4) channel to signal shutdown
 	done := make(chan struct{})
 
+	// register shutdown tool
+	server.RegisterTool("shutdown", func(_ json.RawMessage) (interface{}, error) {
+		log.Printf("→ tool=shutdown")
+		close(done)
+		return "shutting down", nil
+	})
+
 	// 5) start serving MCP requests with logging
 	go func() {
 		if err := server.Serve(); err != nil {
@@ -112,13 +119,6 @@ func runMCP(cmd *cobra.Command, args []string) {
 		}
 	}()
 
-	// register shutdown tool
-	server.RegisterTool("shutdown", func(_ json.RawMessage) (interface{}, error) {
-		log.Printf("→ tool=shutdown")
-		close(done)
-		return "shutting down", nil
-	})
-
-	// 7) wait for shutdown
+	// wait for shutdown
 	<-done
 }
