@@ -62,9 +62,15 @@ func runMCP(cmd *cobra.Command, args []string) {
 	must(server.RegisterTool(
 		"load_url",
 		"Navigate the browser to the given URL",
-		func(a LoadURLArgs) (*mcp.ToolResponse, error) {
+		func(a map[string]any) (*mcp.ToolResponse, error) {
 			log.Printf("→ tool=load_url args=%+v", a)
-			page, err := LoadURL(a.URL)
+			urlVal, ok := a["url"].(string)
+			if !ok {
+				err := fmt.Errorf("load_url: missing or invalid url arg: %v", a["url"])
+				log.Printf("✗ load_url error: %v", err)
+				return nil, fmt.Errorf("load_url failed: %w", err)
+			}
+			page, err := LoadURL(urlVal)
 			if err != nil {
 				log.Printf("✗ load_url error: %v", err)
 				return nil, fmt.Errorf("load_url failed: %w", err)
@@ -81,7 +87,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	must(server.RegisterTool(
 		"get_html",
 		"Return the HTML of the current page",
-		func(_ HTMLArgs) (*mcp.ToolResponse, error) {
+		func(_ map[string]any) (*mcp.ToolResponse, error) {
 			log.Printf("→ tool=get_html")
 			if CurrentElement == nil {
 				err := fmt.Errorf("no page loaded – call load_url first")
@@ -113,7 +119,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	must(server.RegisterTool(
 		"shutdown",
 		"Gracefully shut down the MCP server",
-		func(_ struct{}) (*mcp.ToolResponse, error) {
+		func(_ map[string]any) (*mcp.ToolResponse, error) {
 			log.Printf("→ tool=shutdown")
 			close(done)
 			return mcp.NewToolResponse(mcp.NewTextContent("shutting down")), nil
