@@ -12,7 +12,7 @@ require (
 	github.com/ysmood/gson v0.7.3
 )
 
-replace github.com/metoro-io/mcp-golang => github.com/metoro-io/mcp-golang v0.11.0
+replace github.com/metoro-io/mcp-golang => github.com/metoro-io/mcp-golang main
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
