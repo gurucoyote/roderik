@@ -46,113 +46,63 @@ type ToolSpec struct {
 }
 
 func runMCP(cmd *cobra.Command, args []string) {
-	// FORCE the standard logger to stderr
 	log.SetOutput(os.Stderr)
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
-	// 0) open log file
-	f, err := os.OpenFile(mcpLogPath,
-		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(mcpLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: cannot open mcp log %q: %v\n", mcpLogPath, err)
 	} else {
-		mw := io.MultiWriter(os.Stderr, f)
-		log.SetOutput(mw)
 		defer f.Close()
+		log.SetOutput(io.MultiWriter(os.Stderr, f))
 	}
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
-	// 1) create the server over stdio
-	server := NewServer(os.Stdin, os.Stdout)
+	s := server.NewMCPServer(
+		"roderik",
+		"1.0.0",
+		server.WithToolCapabilities(false),
+	)
 
-	// collect tool specifications
-	toolSpecs := make([]ToolSpec, 0)
+	s.AddTool(
+		mcp.NewTool(
+			"load_url",
+			mcp.WithDescription("Navigate the browser to a URL"),
+			mcp.WithString("url", mcp.Required(), mcp.Description("the URL to navigate to")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			url, _ := req.Params.Arguments["url"].(string)
+			page, err := LoadURL(url)
+			if err != nil {
+				return nil, fmt.Errorf("load_url failed: %w", err)
+			}
+			CurrentElement = page.MustElement("html")
+			msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
+			return mcp.NewToolResultText(msg), nil
+		},
+	)
 
+	s.AddTool(
+		mcp.NewTool(
+			"get_html",
+			mcp.WithDescription("Get HTML of the current element"),
+		),
+		func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if CurrentElement == nil {
+				return nil, fmt.Errorf("no page loaded – call load_url first")
+			}
+			html := CurrentElement.MustHTML()
+			return mcp.NewToolResultText(html), nil
+		},
+	)
 
-	// register load_url
-	server.RegisterTool("load_url", func(raw json.RawMessage) (interface{}, error) {
-		log.Printf("→ tool=load_url raw args=%s", string(raw))
-		var args LoadURLArgs
-		if err := json.Unmarshal(raw, &args); err != nil {
-			log.Printf("✗ load_url unmarshal error: %v", err)
-			return nil, fmt.Errorf("load_url failed: %w", err)
-		}
-		page, err := LoadURL(args.URL)
-		if err != nil {
-			log.Printf("✗ load_url error: %v", err)
-			return nil, fmt.Errorf("load_url failed: %w", err)
-		}
-		CurrentElement = page.MustElement("html")
-		msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
-		log.Printf("✓ load_url response=%q", msg)
-		return msg, nil
-	})
+	s.AddTool(
+		mcp.NewTool("shutdown", mcp.WithDescription("Shut down the MCP server")),
+		func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return mcp.NewToolResultText("shutting down"), context.Canceled
+		},
+	)
 
-	// add load_url spec
-	toolSpecs = append(toolSpecs, ToolSpec{
-		Name:        "load_url",
-		Description: "Navigate the browser to a URL",
-		ArgsSchema: json.RawMessage(`{
-  "type":"object",
-  "properties": {
-    "url": {
-      "type":"string",
-      "description":"the URL to navigate to"
-    }
-  },
-  "required":["url"]
-}`),
-	})
-
-	// register get_html
-	server.RegisterTool("get_html", func(_ json.RawMessage) (interface{}, error) {
-		log.Printf("→ tool=get_html")
-		if CurrentElement == nil {
-			err := fmt.Errorf("no page loaded – call load_url first")
-			log.Printf("✗ get_html error: %v", err)
-			return nil, err
-		}
-		html := CurrentElement.MustHTML()
-		log.Printf("✓ get_html response length=%d", len(html))
-		return html, nil
-	})
-
-	// add get_html spec
-	toolSpecs = append(toolSpecs, ToolSpec{
-		Name:        "get_html",
-		Description: "Get HTML of the current element",
-		ArgsSchema: json.RawMessage(`{
-  "type":"object",
-  "properties": {},
-  "required":[]
-}`),
-	})
-
-	// register list_tools tool for clients to discover available tools
-	server.RegisterTool("list_tools", func(_ json.RawMessage) (interface{}, error) {
-		log.Printf("→ tool=list_tools")
-		return toolSpecs, nil
-	})
-
-	// 4) channel to signal shutdown
-	done := make(chan struct{})
-
-	// register shutdown tool
-	server.RegisterTool("shutdown", func(_ json.RawMessage) (interface{}, error) {
-		log.Printf("→ tool=shutdown")
-		close(done)
-		return "shutting down", nil
-	})
-
-	// 5) start serving MCP requests with logging
-	go func() {
-		if err := server.Serve(); err != nil {
-			log.Printf("server.Serve() error: %v", err)
-		} else {
-			log.Printf("server.Serve() exited cleanly")
-		}
-	}()
-
-	// wait for shutdown
-	<-done
+	if err := server.ServeStdio(s); err != nil {
+		log.Printf("MCP server error: %v", err)
+	}
 }
