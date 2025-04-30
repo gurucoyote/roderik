@@ -1,13 +1,13 @@
 package cmd
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
 
-	mcp "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +49,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	log.Printf("=== starting MCP server ===")
 
 	// 1) create the server over stdio
-	server := mcp.NewServer(stdio.NewStdioServerTransport())
+	server := NewServer(os.Stdin, os.Stdout)
 
 	// helper to log and fatal on registration error
 	must := func(err error) {
@@ -59,7 +59,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	}
 
 	// 2) register load_url with logging
-	must(server.RegisterTool(
+	server.RegisterTool(
 		"load_url",
 		"Navigate the browser to the given URL",
 		func(a map[string]any) (*mcp.ToolResponse, error) {
@@ -84,7 +84,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	))
 
 	// 3) register get_html with logging
-	must(server.RegisterTool(
+	server.RegisterTool(
 		"get_html",
 		"Return the HTML of the current page",
 		func(_ map[string]any) (*mcp.ToolResponse, error) {
@@ -116,7 +116,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	}()
 
 	// 6) register shutdown tool with logging
-	must(server.RegisterTool(
+	server.RegisterTool(
 		"shutdown",
 		"Gracefully shut down the MCP server",
 		func(_ map[string]any) (*mcp.ToolResponse, error) {
