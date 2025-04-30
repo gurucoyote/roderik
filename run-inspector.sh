@@ -18,4 +18,4 @@ cat << 'EOF' > inspector.config.json
 EOF
 
 # Launch the Model Context Protocol Inspector
-npx @modelcontextprotocol/inspector --config=inspector.config.json
+npx @modelcontextprotocol/inspector --config=inspector.config.json --server=roderik-mcp
