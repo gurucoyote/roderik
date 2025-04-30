@@ -51,55 +51,38 @@ func runMCP(cmd *cobra.Command, args []string) {
 	// 1) create the server over stdio
 	server := NewServer(os.Stdin, os.Stdout)
 
-	// helper to log and fatal on registration error
-	must := func(err error) {
-		if err != nil {
-			log.Fatalf("failed to register tool: %v", err)
+
+	// register load_url
+	server.RegisterTool("load_url", func(raw json.RawMessage) (interface{}, error) {
+		log.Printf("→ tool=load_url raw args=%s", string(raw))
+		var args LoadURLArgs
+		if err := json.Unmarshal(raw, &args); err != nil {
+			log.Printf("✗ load_url unmarshal error: %v", err)
+			return nil, fmt.Errorf("load_url failed: %w", err)
 		}
-	}
+		page, err := LoadURL(args.URL)
+		if err != nil {
+			log.Printf("✗ load_url error: %v", err)
+			return nil, fmt.Errorf("load_url failed: %w", err)
+		}
+		CurrentElement = page.MustElement("html")
+		msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
+		log.Printf("✓ load_url response=%q", msg)
+		return msg, nil
+	})
 
-	// 2) register load_url with logging
-	server.RegisterTool(
-		"load_url",
-		"Navigate the browser to the given URL",
-		func(a map[string]any) (*mcp.ToolResponse, error) {
-			log.Printf("→ tool=load_url args=%+v", a)
-			urlVal, ok := a["url"].(string)
-			if !ok {
-				err := fmt.Errorf("load_url: missing or invalid url arg: %v", a["url"])
-				log.Printf("✗ load_url error: %v", err)
-				return nil, fmt.Errorf("load_url failed: %w", err)
-			}
-			page, err := LoadURL(urlVal)
-			if err != nil {
-				log.Printf("✗ load_url error: %v", err)
-				return nil, fmt.Errorf("load_url failed: %w", err)
-			}
-			CurrentElement = page.MustElement("html")
-			msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
-			resp := mcp.NewToolResponse(mcp.NewTextContent(msg))
-			log.Printf("✓ load_url response=%q", msg)
-			return resp, nil
-		},
-	)
-
-	// 3) register get_html with logging
-	server.RegisterTool(
-		"get_html",
-		"Return the HTML of the current page",
-		func(_ map[string]any) (*mcp.ToolResponse, error) {
-			log.Printf("→ tool=get_html")
-			if CurrentElement == nil {
-				err := fmt.Errorf("no page loaded – call load_url first")
-				log.Printf("✗ get_html error: %v", err)
-				return nil, err
-			}
-			html := CurrentElement.MustHTML()
-			resp := mcp.NewToolResponse(mcp.NewTextContent(html))
-			log.Printf("✓ get_html response length=%d", len(html))
-			return resp, nil
-		},
-	)
+	// register get_html
+	server.RegisterTool("get_html", func(_ json.RawMessage) (interface{}, error) {
+		log.Printf("→ tool=get_html")
+		if CurrentElement == nil {
+			err := fmt.Errorf("no page loaded – call load_url first")
+			log.Printf("✗ get_html error: %v", err)
+			return nil, err
+		}
+		html := CurrentElement.MustHTML()
+		log.Printf("✓ get_html response length=%d", len(html))
+		return html, nil
+	})
 
 	// 4) channel to signal shutdown
 	done := make(chan struct{})
@@ -115,16 +98,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 		close(done)
 	}()
 
-	// 6) register shutdown tool with logging
-	server.RegisterTool(
-		"shutdown",
-		"Gracefully shut down the MCP server",
-		func(_ map[string]any) (*mcp.ToolResponse, error) {
-			log.Printf("→ tool=shutdown")
-			close(done)
-			return mcp.NewToolResponse(mcp.NewTextContent("shutting down")), nil
-		},
-	)
+	// register shutdown tool
+	server.RegisterTool("shutdown", func(_ json.RawMessage) (interface{}, error) {
+		log.Printf("→ tool=shutdown")
+		close(done)
+		return "shutting down", nil
+	})
 
 	// 7) wait for shutdown
 	<-done
