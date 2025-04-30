@@ -94,7 +94,6 @@ func runMCP(cmd *cobra.Command, args []string) {
 
 	// 5) start serving MCP requests with logging
 	go func() {
-		log.Printf("server.Serve() starting…")
 		if err := server.Serve(); err != nil {
 			log.Printf("server.Serve() error: %v", err)
 		} else {
@@ -111,5 +110,4 @@ func runMCP(cmd *cobra.Command, args []string) {
 
 	// 7) wait for shutdown
 	<-done
-	log.Printf("=== MCP server exiting ===")
 }
