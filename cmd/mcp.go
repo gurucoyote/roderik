@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	mcp "github.com/metoro-io/mcp-golang"
 	"github.com/metoro-io/mcp-golang/transport/stdio"
@@ -70,12 +71,27 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	))
 
-	// 4) start serving MCP requests in a goroutine
+	// 4) channel to signal shutdown
+	done := make(chan struct{})
+
+	// 5) start serving MCP requests in a goroutine
 	go func() {
 		if err := server.Serve(); err != nil {
 			panic("mcp server error: " + err.Error())
 		}
+		close(done)
 	}()
-	// 5) block forever (so we do not return / exit)
-	select {}
+
+	// 6) register shutdown tool so clients can ask us to quit
+	must(server.RegisterTool(
+		"shutdown",
+		"Gracefully shut down the MCP server",
+		func(_ struct{}) (*mcp.ToolResponse, error) {
+			close(done)
+			return mcp.NewToolResponse(mcp.NewTextContent("shutting down")), nil
+		},
+	))
+
+	// 7) wait for either Serve() to exit or for the shutdown tool
+	<-done
 }
