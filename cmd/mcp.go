@@ -36,6 +36,12 @@ func init() {
 	mcpCmd.SetErr(os.Stderr)
 }
 
+type ToolSpec struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	ArgsSchema  json.RawMessage `json:"args_schema"`
+}
+
 func runMCP(cmd *cobra.Command, args []string) {
 	// FORCE the standard logger to stderr
 	log.SetOutput(os.Stderr)
@@ -55,6 +61,9 @@ func runMCP(cmd *cobra.Command, args []string) {
 
 	// 1) create the server over stdio
 	server := NewServer(os.Stdin, os.Stdout)
+
+	// collect tool specifications
+	toolSpecs := make([]ToolSpec, 0)
 
 
 	// register load_url
@@ -76,6 +85,22 @@ func runMCP(cmd *cobra.Command, args []string) {
 		return msg, nil
 	})
 
+	// add load_url spec
+	toolSpecs = append(toolSpecs, ToolSpec{
+		Name:        "load_url",
+		Description: "Navigate the browser to a URL",
+		ArgsSchema: json.RawMessage(`{
+  "type":"object",
+  "properties": {
+    "url": {
+      "type":"string",
+      "description":"the URL to navigate to"
+    }
+  },
+  "required":["url"]
+}`),
+	})
+
 	// register get_html
 	server.RegisterTool("get_html", func(_ json.RawMessage) (interface{}, error) {
 		log.Printf("→ tool=get_html")
@@ -89,15 +114,21 @@ func runMCP(cmd *cobra.Command, args []string) {
 		return html, nil
 	})
 
+	// add get_html spec
+	toolSpecs = append(toolSpecs, ToolSpec{
+		Name:        "get_html",
+		Description: "Get HTML of the current element",
+		ArgsSchema: json.RawMessage(`{
+  "type":"object",
+  "properties": {},
+  "required":[]
+}`),
+	})
+
 	// register list_tools tool for clients to discover available tools
 	server.RegisterTool("list_tools", func(_ json.RawMessage) (interface{}, error) {
-		// list all registered tool names
-		var names []string
-		for name := range server.tools {
-			names = append(names, name)
-		}
-		log.Printf("✓ list_tools response=%v", names)
-		return names, nil
+		log.Printf("→ tool=list_tools")
+		return toolSpecs, nil
 	})
 
 	// 4) channel to signal shutdown
