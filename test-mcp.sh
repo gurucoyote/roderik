@@ -15,6 +15,6 @@ printf '%s\n' \
   '{"id":2,"tool":"load_url","args":{"url":"https://example.com"}}' \
   '{"id":3,"tool":"get_html","args":{}}' \
   '{"id":4,"tool":"shutdown","args":{}}' \
-| $MCP_CMD | jq .
+| $MCP_CMD | tee /dev/stderr | jq .
 
 echo "✅ Done."
