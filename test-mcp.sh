@@ -11,9 +11,10 @@ echo "🚀 Starting Roderik MCP server test…"
 #  2) get_html     → dump the HTML
 #  3) shutdown     → stop the server
 printf '%s\n' \
-  '{"id":1,"tool":"load_url","args":{"url":"https://example.com"}}' \
-  '{"id":2,"tool":"get_html","args":{}}' \
-  '{"id":3,"tool":"shutdown","args":{}}' \
+  '{"id":1,"tool":"list_tools","args":{}}' \
+  '{"id":2,"tool":"load_url","args":{"url":"https://example.com"}}' \
+  '{"id":3,"tool":"get_html","args":{}}' \
+  '{"id":4,"tool":"shutdown","args":{}}' \
 | $MCP_CMD | jq .
 
 echo "✅ Done."
