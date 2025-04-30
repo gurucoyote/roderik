@@ -1,11 +1,14 @@
 package cmd
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"os"
+
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 )
 
