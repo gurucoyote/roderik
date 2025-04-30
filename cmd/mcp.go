@@ -89,6 +89,17 @@ func runMCP(cmd *cobra.Command, args []string) {
 		return html, nil
 	})
 
+	// register list_tools tool for clients to discover available tools
+	server.RegisterTool("list_tools", func(_ json.RawMessage) (interface{}, error) {
+		// list all registered tool names
+		var names []string
+		for name := range server.tools {
+			names = append(names, name)
+		}
+		log.Printf("✓ list_tools response=%v", names)
+		return names, nil
+	})
+
 	// 4) channel to signal shutdown
 	done := make(chan struct{})
 
