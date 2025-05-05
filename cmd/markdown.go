@@ -48,9 +48,10 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
         fetchAttr := func(attr string) string {
             var val string
             if node.BackendDOMNodeID != 0 {
-                if res, err := proto.DOMResolveNode{
+                resolver := proto.DOMResolveNode{
                     BackendNodeID: proto.DOMBackendNodeID(node.BackendDOMNodeID),
-                }.Call(page); err == nil {
+                }
+                if res, err := resolver.Call(page); err == nil {
                     if el, err2 := page.ElementFromObject(res.Object); err2 == nil {
                         if a, ok := el.Attribute(attr); ok {
                             val = a
