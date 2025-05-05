@@ -11,6 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
+	"github.com/go-rod/rod/lib/proto"
 )
 
 // path to the MCP debug log file, override with --log
@@ -124,6 +125,35 @@ func runMCP(cmd *cobra.Command, args []string) {
 				return nil, fmt.Errorf("duck tool failed: %w", err)
 			}
 			return mcp.NewToolResultText(out), nil
+		},
+	)
+
+	// === Query accessibility tree (quax) ===
+	s.AddTool(
+		mcp.NewTool(
+			"quax",
+			mcp.WithDescription("Query the accessibility tree of the current element and return JSON"),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if CurrentElement == nil {
+				return nil, fmt.Errorf("no element selected: use load_url and element-selection tools first")
+			}
+			// Describe current element to get backend node ID
+			props, err := CurrentElement.Describe(0, false)
+			if err != nil {
+				return nil, fmt.Errorf("describe element failed: %w", err)
+			}
+			// Query the accessibility tree
+			tree, err := proto.AccessibilityQueryAXTree{BackendNodeID: props.BackendNodeID}.Call(Page)
+			if err != nil {
+				return nil, fmt.Errorf("accessibility query failed: %w", err)
+			}
+			// Return the full tree as JSON
+			out, err := json.Marshal(tree)
+			if err != nil {
+				return nil, fmt.Errorf("marshal tree failed: %w", err)
+			}
+			return mcp.NewToolResultText(string(out)), nil
 		},
 	)
 
