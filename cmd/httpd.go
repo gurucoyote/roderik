@@ -3,9 +3,9 @@ package cmd
 import (
 	"encoding/base64"
 	"fmt"
-	"os"
 	"github.com/spf13/cobra"
 	"net/http"
+	"os"
 	"strings"
 )
 
