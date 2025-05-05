@@ -142,7 +142,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	s.AddTool(
 		mcp.NewTool(
 			"quax",
-			mcp.WithDescription("Return a human-readable outline of the accessibility tree for the current element"),
+			mcp.WithDescription("Return a markdown-formatted representation of the current element's accessible content"),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if CurrentElement == nil {
