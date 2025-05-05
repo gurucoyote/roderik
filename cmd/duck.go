@@ -1,13 +1,11 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"text/template"
+	"strings"
 
 	"github.com/sap-nocops/duckduckgogo/client"
 	"github.com/spf13/cobra"
-	"strings"
 )
 
 var numResults int
