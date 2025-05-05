@@ -142,9 +142,18 @@ func runMCP(cmd *cobra.Command, args []string) {
 	s.AddTool(
 		mcp.NewTool(
 			"to_markdown",
-			mcp.WithDescription("Convert the current page/element into a full Markdown document"),
+			mcp.WithDescription("Convert the current page/element (or an optional URL) into a full Markdown document"),
+			mcp.WithString("url", mcp.Description("optional URL to load and convert; if provided, overrides the current element")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// if a URL was passed in, load it first (and reset CurrentElement to <html>)
+			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
+				page, err := LoadURL(raw)
+				if err != nil {
+					return nil, fmt.Errorf("to_markdown failed to load url %q: %w", raw, err)
+				}
+				CurrentElement = page.MustElement("html")
+			}
 			if CurrentElement == nil {
 				return nil, fmt.Errorf("no element selected: use load_url and element-selection tools first")
 			}
