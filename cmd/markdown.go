@@ -32,7 +32,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
     var render func(nodeID proto.AccessibilityAXNodeID, depth int)
     render = func(nodeID proto.AccessibilityAXNodeID, depth int) {
         node, ok := idMap[nodeID]
-        if !ok || (node.Ignored != nil && *node.Ignored) {
+        if !ok || node.Ignored {
             return
         }
 
