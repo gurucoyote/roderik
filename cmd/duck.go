@@ -10,12 +10,7 @@ import (
 	"strings"
 )
 
-var (
-	numResults      int
-	naturalQuestion bool
-	answerQuestion  bool
-	silent          bool
-)
+var numResults int
 var duckCmd = &cobra.Command{
 	Use:   "duck [flags] <search terms>",
 	Short: "search for something on DuckDuckGo",
@@ -24,43 +19,17 @@ var duckCmd = &cobra.Command{
 }
 
 func init() {
-	// Add the duck sub-command to the root command
 	RootCmd.AddCommand(duckCmd)
 	flags := duckCmd.Flags()
 	flags.IntVarP(&numResults, "num", "n", 20, "number of results to return")
-	flags.BoolVarP(&naturalQuestion, "natural-question", "q", false, "treat query as a natural question")
-	flags.BoolVarP(&answerQuestion, "answer", "a", false, "answer the question from search results")
-	flags.BoolVarP(&silent, "silent", "s", false, "suppress intermediate output")
 }
 func runDuck(cmd *cobra.Command, args []string) error {
 	query := strings.Join(args, " ")
-	terms := query
-	if naturalQuestion {
-		var err error
-		terms, err = GenerateSearchTerms(cmd.Context(), query)
-		if err != nil {
-			return fmt.Errorf("generate search terms: %w", err)
-		}
-		if !silent {
-			cmd.Println("User question:", query)
-		}
-	}
-	if !silent {
-		cmd.Println("Search terms:", terms)
-	}
-	result, err := searchDuck(terms, numResults)
+	result, err := searchDuck(query, numResults)
 	if err != nil {
 		return fmt.Errorf("duck search failed: %w", err)
 	}
-	if answerQuestion {
-		answer, err := AnswerQuestion(cmd.Context(), query, result)
-		if err != nil {
-			return fmt.Errorf("answer question failed: %w", err)
-		}
-		cmd.Println("Answer:", answer)
-	} else {
-		cmd.Println(result)
-	}
+	cmd.Println(result)
 	return nil
 }
 func searchDuck(query string, num int) (string, error) {
