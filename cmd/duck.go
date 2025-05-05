@@ -12,10 +12,24 @@ var (
 	numResults int
 	// DuckCmd queries DuckDuckGo for keyword search and prints formatted results.
 	DuckCmd = &cobra.Command{
-		Use:   "duck [flags] <search terms>",
-		Short: "keyword search on DuckDuckGo",
-		Args:  cobra.MinimumNArgs(1),
-		RunE:  runDuck,
+		Use:     "duck [flags] <search terms>",
+		Short:   "Search DuckDuckGo for keyword results",
+		Long: `Duck runs a keyword search on DuckDuckGo.com and prints
+the top N results in a simple markdown-style snippet:
+
+  ## RESULT 1
+  url:     https://duckduckgo.com/
+  title:   DuckDuckGo — Privacy, simplified.
+  snippet: The search engine that doesn’t track you.
+
+You can override how many results to return with --num (default 20).`,
+		Example: `  # Search for “golang cobra”
+  roderik duck cobra golang
+
+  # Limit to 5 results
+  roderik duck -m 5 privacy`,
+		Args:    cobra.MinimumNArgs(1),
+		RunE:    runDuck,
 	}
 )
 
