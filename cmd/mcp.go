@@ -87,11 +87,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 	s.AddTool(
 		mcp.NewTool(
 			"get_html",
-			mcp.WithDescription("Get HTML of the current element"),
-			mcp.WithString("url", mcp.Description("optional URL to load and get HTML from")),
+			mcp.WithDescription("Get HTML of the current element, or load and return HTML from an optional URL"),
+			mcp.WithString("url", mcp.Description("optional URL to load and get HTML from; if provided, overrides the current element")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
+				// loading URL will reset current element to <html>
 				page, err := LoadURL(raw)
 				if err != nil {
 					return nil, fmt.Errorf("get_html failed to load url %q: %w", raw, err)
