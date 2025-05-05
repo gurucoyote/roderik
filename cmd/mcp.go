@@ -138,11 +138,11 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
-	// === Query accessibility tree (quax) as human-readable outline ===
+	// === Convert page to Markdown document ===
 	s.AddTool(
 		mcp.NewTool(
-			"quax",
-			mcp.WithDescription("Return a markdown-formatted representation of the current element's accessible content"),
+			"to_markdown",
+			mcp.WithDescription("Convert the current page/element into a full Markdown document"),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if CurrentElement == nil {
