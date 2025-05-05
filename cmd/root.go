@@ -285,4 +285,5 @@ func init() {
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)
 	RootCmd.AddCommand(ReloadCmd)
+	RootCmd.AddCommand(DuckCmd)
 }
