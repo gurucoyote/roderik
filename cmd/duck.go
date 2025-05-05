@@ -18,38 +18,50 @@ var (
 )
 var duckCmd = &cobra.Command{
 	Use:   "duck [flags] <search terms>",
-	Run:   duckCmdHandler,
-	Short: "search for something on duckduckgo",
+	Short: "search for something on DuckDuckGo",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runDuck,
 }
 
 func init() {
 	// Add the duck sub-command to the root command
-	rootCmd.AddCommand(duckCmd)
-	duckCmd.PersistentFlags().IntVarP(&numResults, "num", "n", 20, "return n number of results")
-	duckCmd.PersistentFlags().BoolVarP(&naturalQuestion, "natural-question", "q", false, "indicates that the query string is a normal question")
-	duckCmd.PersistentFlags().BoolVarP(&answerQuestion, "answer", "a", false, "answer the original user question from the context of the search result")
-	duckCmd.PersistentFlags().BoolVarP(&silent, "silent", "s", false, "suppress all output except the final result")
+	RootCmd.AddCommand(duckCmd)
+	flags := duckCmd.Flags()
+	flags.IntVarP(&numResults, "num", "n", 20, "number of results to return")
+	flags.BoolVarP(&naturalQuestion, "natural-question", "q", false, "treat query as a natural question")
+	flags.BoolVarP(&answerQuestion, "answer", "a", false, "answer the question from search results")
+	flags.BoolVarP(&silent, "silent", "s", false, "suppress intermediate output")
 }
-func duckCmdHandler(cmd *cobra.Command, args []string) {
+func runDuck(cmd *cobra.Command, args []string) error {
 	query := strings.Join(args, " ")
-	searchTerms := query
+	terms := query
 	if naturalQuestion {
-		// If the naturalQuestion flag is set, generate search terms from the user's question
-		searchTerms = GenerateSearchTerms(query)
+		var err error
+		terms, err = GenerateSearchTerms(cmd.Context(), query)
+		if err != nil {
+			return fmt.Errorf("generate search terms: %w", err)
+		}
 		if !silent {
-			cmd.Println("User Question: ", query)
+			cmd.Println("User question:", query)
 		}
 	}
 	if !silent {
-		cmd.Println("Search Terms: ", searchTerms)
+		cmd.Println("Search terms:", terms)
 	}
-	searchResult := Duck(query, numResults)
+	result, err := searchDuck(terms, numResults)
+	if err != nil {
+		return fmt.Errorf("duck search failed: %w", err)
+	}
 	if answerQuestion {
-		answer := AnswerQuestion(query, searchResult)
-		cmd.Println("Answer: ", answer)
+		answer, err := AnswerQuestion(cmd.Context(), query, result)
+		if err != nil {
+			return fmt.Errorf("answer question failed: %w", err)
+		}
+		cmd.Println("Answer:", answer)
 	} else {
-		cmd.Println(searchResult)
+		cmd.Println(result)
 	}
+	return nil
 }
 func Duck(query string, num int) string {
 
