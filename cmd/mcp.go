@@ -109,7 +109,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			"duck",
 			mcp.WithDescription("Search DuckDuckGo and return top N results"),
 			mcp.WithString("query", mcp.Required(), mcp.Description("the search terms")),
-			mcp.WithInt("num", mcp.Description("how many results to return (default 20)")),
+			mcp.WithNumber("num", mcp.Description("how many results to return (default 20)")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			// unwrap arguments
