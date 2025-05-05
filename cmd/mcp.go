@@ -12,6 +12,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 	"github.com/go-rod/rod/lib/proto"
+	"strings"
 )
 
 // path to the MCP debug log file, override with --log
@@ -128,11 +129,11 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
-	// === Query accessibility tree (quax) ===
+	// === Query accessibility tree (quax) as human-readable outline ===
 	s.AddTool(
 		mcp.NewTool(
 			"quax",
-			mcp.WithDescription("Query the accessibility tree of the current element and return JSON"),
+			mcp.WithDescription("Return a human-readable outline of the accessibility tree for the current element"),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if CurrentElement == nil {
@@ -148,12 +149,31 @@ func runMCP(cmd *cobra.Command, args []string) {
 			if err != nil {
 				return nil, fmt.Errorf("accessibility query failed: %w", err)
 			}
-			// Return the full tree as JSON
-			out, err := json.Marshal(tree)
-			if err != nil {
-				return nil, fmt.Errorf("marshal tree failed: %w", err)
+			// Build human-readable outline
+			var sb strings.Builder
+			for _, node := range tree.Nodes {
+				if node.Ignored {
+					continue
+				}
+				role := node.Role.Value.String()
+				switch role {
+				case "LineBreak":
+					sb.WriteString("\n")
+				case "listitem":
+					sb.WriteString("- ")
+				case "link", "button", "textbox":
+					sb.WriteString(role + "(" + fmt.Sprint(node.BackendDOMNodeID) + ") ")
+				case "separator":
+					sb.WriteString("---\n")
+				default:
+					sb.WriteString(role + ": ")
+				}
+				if node.Name != nil {
+					sb.WriteString(node.Name.Value)
+				}
+				sb.WriteString("\n")
 			}
-			return mcp.NewToolResultText(string(out)), nil
+			return mcp.NewToolResultText(sb.String()), nil
 		},
 	)
 
