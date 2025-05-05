@@ -52,7 +52,7 @@ func searchDuck(query string, num int) (string, error) {
 	res, err := ddg.SearchLimited(query, num)
 	if err != nil {
 		var code int
-		if _, scanErr := fmt.Sscanf(err.Error(), "duckduckgo returned status %d", &code); scanErr == nil && code >= 200 && code < 300 {
+		if _, scanErr := fmt.Sscanf(err.Error(), "%*[^0-9]%d", &code); scanErr == nil && code >= 200 && code < 300 {
 			// treat any 2xx status as success; proceed with empty results
 			res = nil
 		} else {
