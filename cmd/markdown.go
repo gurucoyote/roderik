@@ -12,7 +12,7 @@ import (
 // standards-compliant Markdown document.
 func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *rod.Page) string {
     // build a quick lookup by AX node ID
-    idMap := make(map[proto.AccessibilityAXNodeID]proto.AccessibilityAXNode, len(tree.Nodes))
+    idMap := make(map[proto.AccessibilityAXNodeID]*proto.AccessibilityAXNode, len(tree.Nodes))
     for _, n := range tree.Nodes {
         idMap[n.NodeID] = n
     }
@@ -20,7 +20,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
     // find the root of this sub-tree (ParentID == 0)
     var rootID proto.AccessibilityAXNodeID
     for _, n := range tree.Nodes {
-        if n.ParentID == 0 {
+        if n.ParentID == proto.AccessibilityAXNodeID(0) {
             rootID = n.NodeID
             break
         }
@@ -32,7 +32,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
     var render func(nodeID proto.AccessibilityAXNodeID, depth int)
     render = func(nodeID proto.AccessibilityAXNodeID, depth int) {
         node, ok := idMap[nodeID]
-        if !ok || (node.Ignored != nil && *node.Ignored) {
+        if !ok || node.Ignored {
             return
         }
 
@@ -66,16 +66,19 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 
         switch role {
         case "heading":
-            // use headingLevel if present
+            // determine heading level from properties
             level := 1
-            if node.HeadingLevel != nil {
-                level = *node.HeadingLevel
-                if level < 1 {
-                    level = 1
+            for _, prop := range node.Properties {
+                if prop.Name == "headingLevel" && prop.Value.IntValue != nil {
+                    level = int(*prop.Value.IntValue)
+                    break
                 }
-                if level > 6 {
-                    level = 6
-                }
+            }
+            if level < 1 {
+                level = 1
+            }
+            if level > 6 {
+                level = 6
             }
             sb.WriteString(strings.Repeat("#", level) + " " + name + "\n\n")
 
