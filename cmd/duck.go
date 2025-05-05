@@ -8,17 +8,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var numResults int
-var duckCmd = &cobra.Command{
-	Use:   "duck [flags] <search terms>",
-	Short: "search for something on DuckDuckGo",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  runDuck,
-}
+var (
+	numResults int
+	// DuckCmd queries DuckDuckGo for keyword search and prints formatted results.
+	DuckCmd = &cobra.Command{
+		Use:   "duck [flags] <search terms>",
+		Short: "keyword search on DuckDuckGo",
+		Args:  cobra.MinimumNArgs(1),
+		RunE:  runDuck,
+	}
+)
 
 func init() {
-	RootCmd.AddCommand(duckCmd)
-	flags := duckCmd.Flags()
+	RootCmd.AddCommand(DuckCmd)
+	flags := DuckCmd.Flags()
 	flags.IntVarP(&numResults, "num", "n", 20, "number of results to return")
 }
 func runDuck(cmd *cobra.Command, args []string) error {
