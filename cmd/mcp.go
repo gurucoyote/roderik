@@ -169,7 +169,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 					sb.WriteString(role + ": ")
 				}
 				if node.Name != nil {
-					sb.WriteString(node.Name.Value)
+					sb.WriteString(node.Name.Value.String())
 				}
 				sb.WriteString("\n")
 			}
