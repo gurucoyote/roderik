@@ -63,22 +63,20 @@ func runDuck(cmd *cobra.Command, args []string) error {
 	}
 	return nil
 }
-func Duck(query string, num int) string {
-
+func searchDuck(query string, num int) (string, error) {
 	ddg := client.NewDuckDuckGoSearchClient()
 	res, err := ddg.SearchLimited(query, num)
 	if err != nil {
-		fmt.Printf("error: %v", err)
-		return ""
+		return "", err
 	}
-	result := ""
+	var sb strings.Builder
 	for i, r := range res {
-		result += fmt.Sprintf("## RESULT %d\n", i+1)
-		result += fmt.Sprintf("url:     %s\n", r.FormattedUrl)
-		result += fmt.Sprintf("title:   %s\n", r.Title)
-		result += fmt.Sprintf("snippet: %s\n", r.Snippet)
+		sb.WriteString(fmt.Sprintf("## RESULT %d\n", i+1))
+		sb.WriteString(fmt.Sprintf("url:     %s\n", r.FormattedUrl))
+		sb.WriteString(fmt.Sprintf("title:   %s\n", r.Title))
+		sb.WriteString(fmt.Sprintf("snippet: %s\n", r.Snippet))
 	}
-	return result
+	return sb.String(), nil
 }
 
 func AnswerQuestion(question string, context string) string {
@@ -129,35 +127,25 @@ Use the following format for the URLs:
 	return answer
 }
 
-func GenerateSearchTerms(question string) string {
+func GenerateSearchTerms(ctx context.Context, question string) (string, error) {
 	// Define the template
 	tmpl := `Given the user's question: '{{.Question}}', generate a space-separated list of search terms to feed to a search engine.`
-
-	// Create a new template and parse the prompt into it
 	promptTemplate, err := template.New("prompt").Parse(tmpl)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-
-	// Create a new PromptData struct to hold the data for the template
 	data := struct {
 		Question string
 	}{
 		Question: question,
 	}
-
-	// Create a bytes.Buffer to hold the generated prompt
 	var prompt bytes.Buffer
-
-	// Execute the template, inserting the data and writing the output to the prompt buffer
-	err = promptTemplate.Execute(&prompt, data)
-	if err != nil {
-		panic(err)
+	if err := promptTemplate.Execute(&prompt, data); err != nil {
+		return "", err
 	}
-
-	// Call the TldrPromptSend function with the created prompt
-	answer, _ := TldrPromptSend(prompt.String())
-
-	// Return the list of search terms
-	return answer
+	answer, err := TldrPromptSend(ctx, prompt.String())
+	if err != nil {
+		return "", err
+	}
+	return answer, nil
 }
