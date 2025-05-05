@@ -12,13 +12,13 @@ import (
 // standards-compliant Markdown document.
 func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *rod.Page) string {
     // build a quick lookup by AX node ID
-    idMap := make(map[proto.AXNodeID]proto.AXNode, len(tree.Nodes))
+    idMap := make(map[proto.AccessibilityAXNodeID]proto.AccessibilityAXNode, len(tree.Nodes))
     for _, n := range tree.Nodes {
         idMap[n.NodeID] = n
     }
 
     // find the root of this sub-tree (ParentID == 0)
-    var rootID proto.AXNodeID
+    var rootID proto.AccessibilityAXNodeID
     for _, n := range tree.Nodes {
         if n.ParentID == 0 {
             rootID = n.NodeID
@@ -29,10 +29,10 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
     var sb strings.Builder
 
     // recursive renderer
-    var render func(nodeID proto.AXNodeID, depth int)
-    render = func(nodeID proto.AXNodeID, depth int) {
+    var render func(nodeID proto.AccessibilityAXNodeID, depth int)
+    render = func(nodeID proto.AccessibilityAXNodeID, depth int) {
         node, ok := idMap[nodeID]
-        if !ok || node.Ignored {
+        if !ok || (node.Ignored != nil && *node.Ignored) {
             return
         }
 
@@ -54,7 +54,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
                 if res, err := resolver.Call(page); err == nil {
                     if el, err2 := page.ElementFromObject(res.Object); err2 == nil {
                         if a, ok := el.Attribute(attr); ok {
-                            val = a
+                            val = *a
                         }
                     }
                 }
