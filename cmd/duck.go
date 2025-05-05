@@ -51,7 +51,13 @@ func searchDuck(query string, num int) (string, error) {
 	ddg := client.NewDuckDuckGoSearchClient()
 	res, err := ddg.SearchLimited(query, num)
 	if err != nil {
-		return "", err
+		var code int
+		if _, scanErr := fmt.Sscanf(err.Error(), "duckduckgo returned status %d", &code); scanErr == nil && code >= 200 && code < 300 {
+			// treat any 2xx status as success; proceed with empty results
+			res = nil
+		} else {
+			return "", err
+		}
 	}
 	var sb strings.Builder
 	for i, r := range res {
