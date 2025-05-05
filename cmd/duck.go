@@ -79,8 +79,7 @@ func searchDuck(query string, num int) (string, error) {
 	return sb.String(), nil
 }
 
-func AnswerQuestion(question string, context string) string {
-	// Define the template
+func AnswerQuestion(ctx context.Context, question, contextStr string) (string, error) {
 	tmpl := `Given the user's question: '{{.Question}}'
 
  and these search results:
@@ -95,36 +94,26 @@ Use the following format for the URLs:
 3. ...
 
  `
-
-	// Create a new template and parse the prompt into it
 	promptTemplate, err := template.New("prompt").Parse(tmpl)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-
-	// Create a new PromptData struct to hold the data for the template
 	data := struct {
 		Question string
 		Context  string
 	}{
 		Question: question,
-		Context:  context,
+		Context:  contextStr,
 	}
-
-	// Create a bytes.Buffer to hold the generated prompt
 	var prompt bytes.Buffer
-
-	// Execute the template, inserting the data and writing the output to the prompt buffer
-	err = promptTemplate.Execute(&prompt, data)
-	if err != nil {
-		panic(err)
+	if err := promptTemplate.Execute(&prompt, data); err != nil {
+		return "", err
 	}
-
-	// Call the TldrPromptSend function with the created prompt
-	answer, _ := TldrPromptSend(prompt.String())
-
-	// Return the answer
-	return answer
+	answer, err := TldrPromptSend(ctx, prompt.String())
+	if err != nil {
+		return "", err
+	}
+	return answer, nil
 }
 
 func GenerateSearchTerms(ctx context.Context, question string) (string, error) {
