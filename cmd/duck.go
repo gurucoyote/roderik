@@ -22,7 +22,7 @@ var (
 func init() {
 	RootCmd.AddCommand(DuckCmd)
 	flags := DuckCmd.Flags()
-	flags.IntVarP(&numResults, "num", "n", 20, "number of results to return")
+	flags.IntVarP(&numResults, "num", "m", 20, "number of results to return")
 }
 func runDuck(cmd *cobra.Command, args []string) error {
 	query := strings.Join(args, " ")
