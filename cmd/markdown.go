@@ -20,7 +20,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
     // find the root of this sub-tree (ParentID == 0)
     var rootID proto.AccessibilityAXNodeID
     for _, n := range tree.Nodes {
-        if n.ParentID == 0 {
+        if n.ParentID == proto.AccessibilityAXNodeID(0) {
             rootID = n.NodeID
             break
         }
@@ -47,7 +47,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
         // helper to fetch an attribute (href/src) for links/images
         fetchAttr := func(attr string) string {
             var val string
-            if node.BackendDOMNodeID != 0 {
+            if node.BackendDOMNodeID != proto.DOMBackendNodeID(0) {
                 resolver := proto.DOMResolveNode{
                     BackendNodeID: proto.DOMBackendNodeID(node.BackendDOMNodeID),
                 }
