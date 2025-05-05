@@ -53,7 +53,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
                 }
                 if res, err := resolver.Call(page); err == nil {
                     if el, err2 := page.ElementFromObject(res.Object); err2 == nil {
-                        if a, ok := el.Attribute(attr); ok {
+                        if a, err := el.Attribute(attr); err == nil {
                             val = *a
                         }
                     }
