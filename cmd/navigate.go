@@ -7,19 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	RootCmd.AddCommand(SearchCmd)
-	RootCmd.AddCommand(FirstCmd)
-	RootCmd.AddCommand(LastCmd)
-	RootCmd.AddCommand(NsCmd)
-	RootCmd.AddCommand(PsCmd)
-	RootCmd.AddCommand(WalkCmd)
-	RootCmd.AddCommand(ParentCmd)
-	RootCmd.AddCommand(ChildCmd)
-	RootCmd.AddCommand(HeadCmd)
-	RootCmd.AddCommand(BodyCmd)
-	RootCmd.AddCommand(ElemCmd)
-}
 
 func hasCurrentElement() bool {
 	if CurrentElement == nil {
