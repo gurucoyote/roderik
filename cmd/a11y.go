@@ -101,10 +101,44 @@ var quaxCmd = &cobra.Command{
 	},
 }
 
+var markdownCmd = &cobra.Command{
+	Use:   "to_markdown",
+	Short: "Convert the current element or page into a Markdown document",
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) > 0 {
+			url := args[0]
+			if isValidURL(url) {
+				page, err := LoadURL(url)
+				if err != nil {
+					fmt.Println("Error loading URL:", err)
+					return
+				}
+				CurrentElement = page.MustElement("html")
+			}
+		}
+		if !hasCurrentElement() {
+			return
+		}
+		props, err := CurrentElement.Describe(0, false)
+		if err != nil {
+			fmt.Println("Error describing element:", err)
+			return
+		}
+		tree, err := proto.AccessibilityQueryAXTree{BackendNodeID: props.BackendNodeID}.Call(Page)
+		if err != nil {
+			fmt.Println("Error querying accessibility tree:", err)
+			return
+		}
+		md := convertAXTreeToMarkdown(tree, Page)
+		fmt.Println(md)
+	},
+}
+
 func init() {
 	quaxCmd.Flags().BoolVarP(&OutputJson, "json", "j", false, "Output JSON format")
 	RootCmd.AddCommand(quaxCmd)
 	RootCmd.AddCommand(pickCmd)
+	RootCmd.AddCommand(markdownCmd)
 }
 
 var pickCmd = &cobra.Command{
