@@ -103,6 +103,30 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
+	// === DuckDuckGo keyword search ===
+	s.AddTool(
+		mcp.NewTool(
+			"duck",
+			mcp.WithDescription("Search DuckDuckGo and return top N results"),
+			mcp.WithString("query", mcp.Required(), mcp.Description("the search terms")),
+			mcp.WithInt("num", mcp.Description("how many results to return (default 20)")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// unwrap arguments
+			q, _ := req.Params.Arguments["query"].(string)
+			n := numResults
+			if v, ok := req.Params.Arguments["num"].(float64); ok {
+				n = int(v)
+			}
+			// invoke the same logic as the CLI
+			out, err := searchDuck(q, n)
+			if err != nil {
+				return nil, fmt.Errorf("duck tool failed: %w", err)
+			}
+			return mcp.NewToolResultText(out), nil
+		},
+	)
+
 	if err := server.ServeStdio(s); err != nil {
 		log.Printf("MCP server error: %v", err)
 	}
