@@ -68,6 +68,10 @@ func (c *DuckDuckGoSearchClient) SearchLimited(query string, limit int) ([]Resul
 		}
 		results = append(results, c.collectResult(s))
 	})
+	if limit > 0 && len(results) == 0 {
+		// fallback for simple HTML structures without wrapper elements
+		results = append(results, c.collectResult(doc.Selection))
+	}
 	return results, nil
 }
 
