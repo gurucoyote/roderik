@@ -19,7 +19,7 @@ type loggingRoundTripper struct{ rt http.RoundTripper }
 func (l *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := l.rt.RoundTrip(req)
 	if err == nil {
-		log.Printf("[HTTP] %s -> %d", req.URL, resp.StatusCode)
+		log.Printf("[HTTP] -> %d", resp.StatusCode)
 	}
 	return resp, err
 }
