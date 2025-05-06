@@ -10,6 +10,7 @@ import (
 )
 
 func init() {
+	log.SetFlags(log.Ltime)
 	// wrap the default transport so we can print every status code
 	http.DefaultTransport = &loggingRoundTripper{rt: http.DefaultTransport}
 }
