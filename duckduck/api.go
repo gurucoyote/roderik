@@ -28,14 +28,24 @@ type DuckDuckGoSearchClient struct {
 
 func NewDuckDuckGoSearchClient() *DuckDuckGoSearchClient {
 	jar, _ := cookiejar.New(nil)
-	httpClient := &http.Client{Jar: jar}
+	httpClient := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Return ErrUseLastResponse so we see 3xx responses instead of following redirects
+			return http.ErrUseLastResponse
+		},
+	}
 	return &DuckDuckGoSearchClient{
-		baseUrl:      "https://duckduckgo.com/html/",
+		// use DuckDuckGo's HTML‐only subdomain
+		baseUrl:      "https://html.duckduckgo.com/html/",
 		MaxRetries:   3,
 		InitialDelay: 5 * time.Second,
 		Backoff:      4 * time.Second,
 		client:       httpClient,
-		UserAgent:    "Mozilla/5.0 (compatible; RoderikBot/1.0; +https://example.com)",
+		// a realistic Chrome user‐agent to reduce rate‐limiting
+		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+			"AppleWebKit/537.36 (KHTML, like Gecko) " +
+			"Chrome/114.0.0.0 Safari/537.36",
 	}
 }
 func (c *DuckDuckGoSearchClient) Search(query string) ([]Result, error) {
