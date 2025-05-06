@@ -27,7 +27,7 @@ func NewDuckDuckGoSearchClient() *DuckDuckGoSearchClient {
 	return &DuckDuckGoSearchClient{
 		baseUrl:      "https://duckduckgo.com/html/",
 		MaxRetries:   3,
-		InitialDelay: 1 * time.Second,
+		InitialDelay: 5 * time.Second,
 		Backoff:      4 * time.Second,
 	}
 }
