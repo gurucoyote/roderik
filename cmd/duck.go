@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"roderik/client"
+	"roderik/duckduck"
 	"github.com/spf13/cobra"
 )
 

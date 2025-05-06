@@ -5,6 +5,7 @@ go 1.23
 toolchain go1.24.2
 
 require (
+	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/chzyer/readline v1.5.1
 	github.com/go-rod/rod v0.116.2
 	github.com/mark3labs/mcp-go v0.24.1
@@ -15,7 +16,6 @@ require (
 replace github.com/metoro-io/mcp-golang => github.com/metoro-io/mcp-golang v0.11.0
 
 require (
-	github.com/PuerkitoBio/goquery v1.6.0 // indirect
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
