@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sap-nocops/duckduckgogo/client"
+	"roderik/client"
 	"github.com/spf13/cobra"
 )
 

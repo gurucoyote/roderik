@@ -8,7 +8,6 @@ require (
 	github.com/chzyer/readline v1.5.1
 	github.com/go-rod/rod v0.116.2
 	github.com/mark3labs/mcp-go v0.24.1
-	github.com/sap-nocops/duckduckgogo v0.0.0-20201102135645-176990152850
 	github.com/spf13/cobra v1.8.1
 	github.com/ysmood/gson v0.7.3
 )
