@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"roderik/duckduck"
+	client "roderik/duckduck"
 )
 
 func init() {
@@ -30,7 +30,7 @@ func main() {
 		"golang", "cobra", "privacy", "security",
 	}
 
-	ddg := duckduck.NewDuckDuckGoSearchClient()
+	ddg := client.NewDuckDuckGoSearchClient()
 	ddg.MaxRetries = 5
 	ddg.Backoff = 500 * time.Millisecond
 
