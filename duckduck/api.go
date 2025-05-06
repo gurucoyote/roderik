@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strconv"
 	"strings"
@@ -21,14 +22,20 @@ type DuckDuckGoSearchClient struct {
 	MaxRetries   int
 	InitialDelay time.Duration
 	Backoff      time.Duration
+	client       *http.Client
+	UserAgent    string
 }
 
 func NewDuckDuckGoSearchClient() *DuckDuckGoSearchClient {
+	jar, _ := cookiejar.New(nil)
+	httpClient := &http.Client{Jar: jar}
 	return &DuckDuckGoSearchClient{
 		baseUrl:      "https://duckduckgo.com/html/",
 		MaxRetries:   3,
 		InitialDelay: 5 * time.Second,
 		Backoff:      4 * time.Second,
+		client:       httpClient,
+		UserAgent:    "Mozilla/5.0 (compatible; RoderikBot/1.0; +https://example.com)",
 	}
 }
 func (c *DuckDuckGoSearchClient) Search(query string) ([]Result, error) {
@@ -45,7 +52,9 @@ func (c *DuckDuckGoSearchClient) SearchLimited(query string, limit int) ([]Resul
 	var resp *http.Response
 	var err error
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
-		resp, err = http.Get(queryUrl)
+		req, _ := http.NewRequest("GET", queryUrl, nil)
+		req.Header.Set("User-Agent", c.UserAgent)
+		resp, err = c.client.Do(req)
 		if err != nil {
 			return nil, err
 		}
