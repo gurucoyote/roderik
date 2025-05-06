@@ -17,12 +17,16 @@ type SearchClient interface {
 }
 
 type DuckDuckGoSearchClient struct {
-	baseUrl string
+	baseUrl    string
+	MaxRetries int
+	Backoff    time.Duration
 }
 
 func NewDuckDuckGoSearchClient() *DuckDuckGoSearchClient {
 	return &DuckDuckGoSearchClient{
-		baseUrl: "https://duckduckgo.com/html/",
+		baseUrl:    "https://duckduckgo.com/html/",
+		MaxRetries: 3,
+		Backoff:    1 * time.Second,
 	}
 }
 func (c *DuckDuckGoSearchClient) Search(query string) ([]Result, error) {
@@ -32,26 +36,22 @@ func (c *DuckDuckGoSearchClient) Search(query string) ([]Result, error) {
 func (c *DuckDuckGoSearchClient) SearchLimited(query string, limit int) ([]Result, error) {
 	queryUrl := c.baseUrl + "?q=" + url.QueryEscape(query)
 
-	const (
-		maxRetries = 3
-		backoff    = 1 * time.Second
-	)
 	var resp *http.Response
 	var err error
-	for attempt := 0; attempt <= maxRetries; attempt++ {
+	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
 		resp, err = http.Get(queryUrl)
 		if err != nil {
 			return nil, err
 		}
-		if resp.StatusCode == 200 {
+		if resp.StatusCode == http.StatusOK {
 			break
 		}
 		resp.Body.Close()
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			if attempt == maxRetries {
+		if resp.StatusCode >= http.StatusOK && resp.StatusCode < 300 {
+			if attempt == c.MaxRetries {
 				return []Result{}, nil
 			}
-			time.Sleep(backoff)
+			time.Sleep(c.Backoff)
 			continue
 		}
 		return nil, fmt.Errorf("unexpected status code %d", resp.StatusCode)
