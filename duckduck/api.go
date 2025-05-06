@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -31,14 +32,31 @@ func (c *DuckDuckGoSearchClient) Search(query string) ([]Result, error) {
 func (c *DuckDuckGoSearchClient) SearchLimited(query string, limit int) ([]Result, error) {
 	queryUrl := c.baseUrl + "?q=" + url.QueryEscape(query)
 
-	resp, err := http.Get(queryUrl)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	const (
+		maxRetries = 3
+		backoff    = 1 * time.Second
+	)
+	var resp *http.Response
+	var err error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		resp, err = http.Get(queryUrl)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode == 200 {
+			break
+		}
+		resp.Body.Close()
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			if attempt == maxRetries {
+				return []Result{}, nil
+			}
+			time.Sleep(backoff)
+			continue
+		}
 		return nil, fmt.Errorf("unexpected status code %d", resp.StatusCode)
 	}
+	defer resp.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, err
