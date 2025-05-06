@@ -26,7 +26,7 @@ func NewDuckDuckGoSearchClient() *DuckDuckGoSearchClient {
 	return &DuckDuckGoSearchClient{
 		baseUrl:    "https://duckduckgo.com/html/",
 		MaxRetries: 3,
-		Backoff:    1 * time.Second,
+		Backoff:    4 * time.Second,
 	}
 }
 func (c *DuckDuckGoSearchClient) Search(query string) ([]Result, error) {
@@ -51,7 +51,7 @@ func (c *DuckDuckGoSearchClient) SearchLimited(query string, limit int) ([]Resul
 			if attempt == c.MaxRetries {
 				return []Result{}, nil
 			}
-			time.Sleep(c.Backoff)
+			time.Sleep(c.Backoff * (1 << attempt))
 			continue
 		}
 		return nil, fmt.Errorf("unexpected status code %d", resp.StatusCode)
