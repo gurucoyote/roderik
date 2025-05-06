@@ -32,7 +32,7 @@ func main() {
 
 	ddg := client.NewDuckDuckGoSearchClient()
 	ddg.MaxRetries = 5
-	ddg.Backoff = 500 * time.Millisecond
+	ddg.Backoff = 2 * time.Second
 
 	for i, kw := range keywords {
 		// to really vary your queries you can append a random suffix
