@@ -36,8 +36,15 @@ func (c *DuckDuckGoSearchClient) SearchLimited(query string, limit int) ([]Resul
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("return status code %d", resp.StatusCode)
+	code := resp.StatusCode
+	switch {
+	case code == 200:
+		// perfect: continue to parse
+	case code >= 200 && code < 300:
+		// other 2xx: return empty results
+		return []Result{}, nil
+	default:
+		return nil, fmt.Errorf("unexpected status code %d", code)
 	}
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
