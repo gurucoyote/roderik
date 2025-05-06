@@ -17,16 +17,18 @@ type SearchClient interface {
 }
 
 type DuckDuckGoSearchClient struct {
-	baseUrl    string
-	MaxRetries int
-	Backoff    time.Duration
+	baseUrl      string
+	MaxRetries   int
+	InitialDelay time.Duration
+	Backoff      time.Duration
 }
 
 func NewDuckDuckGoSearchClient() *DuckDuckGoSearchClient {
 	return &DuckDuckGoSearchClient{
-		baseUrl:    "https://duckduckgo.com/html/",
-		MaxRetries: 3,
-		Backoff:    4 * time.Second,
+		baseUrl:      "https://duckduckgo.com/html/",
+		MaxRetries:   3,
+		InitialDelay: 1 * time.Second,
+		Backoff:      4 * time.Second,
 	}
 }
 func (c *DuckDuckGoSearchClient) Search(query string) ([]Result, error) {
@@ -35,6 +37,10 @@ func (c *DuckDuckGoSearchClient) Search(query string) ([]Result, error) {
 
 func (c *DuckDuckGoSearchClient) SearchLimited(query string, limit int) ([]Result, error) {
 	queryUrl := c.baseUrl + "?q=" + url.QueryEscape(query)
+
+	if c.InitialDelay > 0 {
+		time.Sleep(c.InitialDelay)
+	}
 
 	var resp *http.Response
 	var err error
