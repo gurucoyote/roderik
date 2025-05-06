@@ -31,6 +31,7 @@ func main() {
 	}
 
 	ddg := client.NewDuckDuckGoSearchClient()
+	log.Printf("Using InitialDelay=%v, Backoff=%v", ddg.InitialDelay, ddg.Backoff)
 	ddg.MaxRetries = 5
 	ddg.Backoff = 2 * time.Second
 
