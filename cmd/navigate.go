@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 func hasCurrentElement() bool {
 	if CurrentElement == nil {
 		fmt.Println("Error: CurrentElement is not defined. Please load a page or navigate to an element first.")

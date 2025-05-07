@@ -8,10 +8,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
-	"github.com/go-rod/rod/lib/proto"
 	"strings"
 )
 

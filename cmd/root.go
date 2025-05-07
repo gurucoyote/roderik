@@ -91,7 +91,13 @@ var RootCmd = &cobra.Command{
 			return
 		}
 
-		headings, _ := Page.Elements("h1, h2, h3, h4, h5, h6")
+		// headings, _ := Page.Elements("h1, h2, h3, h4, h5, h6")
+		var headings []*rod.Element
+		for _, tag := range []string{"h1", "h2", "h3", "h4", "h5", "h6"} {
+			elems, _ := Page.Elements(tag)
+			headings = append(headings, elems...)
+		}
+
 		if len(headings) > 0 {
 			CurrentElement = headings[0]
 		} else {

@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"strings"
 
-	"roderik/duckduck"
 	"github.com/spf13/cobra"
+	"roderik/duckduck"
 )
 
 var (
 	numResults int
 	// DuckCmd queries DuckDuckGo for keyword search and prints formatted results.
 	DuckCmd = &cobra.Command{
-		Use:     "duck [flags] <search terms>",
-		Short:   "Search DuckDuckGo for keyword results",
+		Use:   "duck [flags] <search terms>",
+		Short: "Search DuckDuckGo for keyword results",
 		Long: `Duck runs a keyword search on DuckDuckGo.com and prints
 the top N results in a simple markdown-style snippet:
 
@@ -28,8 +28,8 @@ You can override how many results to return with --num (default 20).`,
 
   # Limit to 5 results
   roderik duck -m 5 privacy`,
-		Args:    cobra.MinimumNArgs(1),
-		RunE:    runDuck,
+		Args: cobra.MinimumNArgs(1),
+		RunE: runDuck,
 	}
 )
 
@@ -68,4 +68,3 @@ func searchDuck(query string, num int) (string, error) {
 	}
 	return sb.String(), nil
 }
-
