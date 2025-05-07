@@ -194,7 +194,8 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	if err != nil {
 		return nil, err
 	}
-	Page.WaitLoad()
+	// wait for full load and idle so injected helpers are ready
+	Page.MustWaitLoad().MustWaitIdle()
 	return Page, nil
 }
 
