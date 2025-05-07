@@ -65,8 +65,11 @@ var HeadCmd = &cobra.Command{
 			return
 		}
 
-		if len(headings) > 0 {
-			CurrentElement = headings[0]
+		// setup navigable heading list
+		elementList = headings
+		if len(elementList) > 0 {
+			currentIndex = 0
+			CurrentElement = elementList[currentIndex]
 		}
 		ReportElement(CurrentElement)
 	},

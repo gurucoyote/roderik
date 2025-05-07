@@ -97,9 +97,12 @@ var RootCmd = &cobra.Command{
 			elems, _ := Page.Elements(tag)
 			headings = append(headings, elems...)
 		}
+		// setup navigable heading list
+		elementList = headings
 
-		if len(headings) > 0 {
-			CurrentElement = headings[0]
+		if len(elementList) > 0 {
+			currentIndex = 0
+			CurrentElement = elementList[currentIndex]
 		} else {
 			CurrentElement, err = Page.Element("body")
 			if err != nil {
