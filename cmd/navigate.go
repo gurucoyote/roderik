@@ -60,11 +60,14 @@ var HeadCmd = &cobra.Command{
 		if len(args) > 0 {
 			selector = fmt.Sprintf("h%s", args[0])
 		}
-		headings, err := Page.Elements(selector)
-		if err != nil {
-			fmt.Println("couldn't find any heading of type ", selector, err)
-			return
-		}
+		// headings, err := Page.Elements(selector)
+		   var headings []*rod.Element
+		   // TODO: use the selector string above, split into slice
+   for _, tag := range []string{"h1", "h2", "h3", "h4", "h5", "h6"} {
+       elems, _ := Page.Elements(tag)
+       headings = append(headings, elems...)
+   }
+
 		if len(headings) > 0 {
 			CurrentElement = headings[0]
 		}
