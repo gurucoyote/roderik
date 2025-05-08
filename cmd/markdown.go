@@ -85,6 +85,13 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 			}
 			return // do NOT recurse into static-text children
 
+		// explicit handling of text nodes
+		case "staticText", "StaticText", "inlineTextBox", "InlineTextBox", "labelText", "LabelText":
+			if name != "" {
+				sb.WriteString(indent + name + "\n\n")
+			}
+			return
+
 		case "list":
 			// just recurse; listitems will render themselves
 			for _, cid := range node.ChildIDs {
@@ -98,6 +105,11 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 			for _, cid := range node.ChildIDs {
 				render(cid, depth+1)
 			}
+			return
+
+		// add explicit handling for hard line breaks
+		case "lineBreak", "LineBreak":
+			sb.WriteString("\n")
 			return
 
 		case "link":
