@@ -54,6 +54,14 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 		return *a
 	}
 
+	// helper to look up a node's parent (or nil)
+	parentOf := func(n *proto.AccessibilityAXNode) *proto.AccessibilityAXNode {
+		if p, ok := idMap[n.ParentID]; ok {
+			return p
+		}
+		return nil
+	}
+
 	// Simple Markdown renderer:
 	for _, node := range tree.Nodes {
 		if node.Ignored {
@@ -65,49 +73,72 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 			name = node.Name.Value.String()
 		}
 
+		// get parent's role if we need it
+		var pRole string
+		if p := parentOf(node); p != nil {
+			pRole = p.Role.Value.String()
+		}
+
 		switch role {
 		case "heading":
-			// Use a single # for all headings; you can bump level if you track depth
-			sb.WriteString("# " + name + "\n\n")
+			// one blank line before, two after
+			sb.WriteString("\n# " + name + "\n\n")
+			continue
 
-		case "paragraph", "StaticText":
-			// paragraphs or free text
-			if name != "" {
-				sb.WriteString(name + "\n\n")
-			}
+		case "paragraph":
+			// paragraph node already has its full text as Name
+			sb.WriteString(name + "\n\n")
+			continue
 
 		case "listitem":
-			sb.WriteString("- " + name + "\n")
+			// start a bullet; we'll append the text or link in the child nodes
+			sb.WriteString("- ")
+			continue
+
+		case "link":
+			href := fetchAttr(node, "href")
+			if href != "" {
+				if pRole == "listitem" {
+					sb.WriteString(fmt.Sprintf("[%s](%s)\n", name, href))
+				} else {
+					sb.WriteString(fmt.Sprintf("[%s](%s)", name, href))
+				}
+			} else {
+				if pRole == "listitem" {
+					sb.WriteString(name + "\n")
+				} else {
+					sb.WriteString(name)
+				}
+			}
+			continue
+
+		case "StaticText", "inlineTextBox":
+			if pRole == "paragraph" {
+				sb.WriteString(name)
+			} else if pRole == "listitem" {
+				sb.WriteString(name + "\n")
+			}
+			continue
 
 		case "separator":
 			sb.WriteString("---\n\n")
-
-		case "link":
-			// Markdown link
-			href := fetchAttr(node, "href")
-			if href != "" {
-				sb.WriteString(fmt.Sprintf("[%s](%s)", name, href))
-			} else if name != "" {
-				sb.WriteString(name)
-			}
+			continue
 
 		case "image", "img":
-			// Markdown image
 			src := fetchAttr(node, "src")
 			sb.WriteString(fmt.Sprintf("![%s](%s)\n\n", name, src))
+			continue
 
 		case "button", "textbox":
-			// render as a bolded button/textbox label
 			sb.WriteString(fmt.Sprintf("**%s**\n\n", name))
+			continue
 
 		case "LineBreak":
 			sb.WriteString("  \n") // Markdown hard line-break
+			continue
 
 		default:
-			// fallback: just emit the name
-			if name != "" {
-				sb.WriteString(name + "\n\n")
-			}
+			// skip generic, inlineTextBox, etc.
 		}
 	}
 	return sb.String()
