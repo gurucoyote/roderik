@@ -167,31 +167,9 @@ func runMCP(cmd *cobra.Command, args []string) {
 			if err != nil {
 				return nil, fmt.Errorf("accessibility query failed: %w", err)
 			}
-			// Build human-readable outline
-			var sb strings.Builder
-			for _, node := range tree.Nodes {
-				if node.Ignored {
-					continue
-				}
-				role := node.Role.Value.String()
-				switch role {
-				case "LineBreak":
-					sb.WriteString("\n")
-				case "listitem":
-					sb.WriteString("- ")
-				case "link", "button", "textbox":
-					sb.WriteString(role + "(" + fmt.Sprint(node.BackendDOMNodeID) + ") ")
-				case "separator":
-					sb.WriteString("---\n")
-				default:
-					sb.WriteString(role + ": ")
-				}
-				if node.Name != nil {
-					sb.WriteString(node.Name.Value.String())
-				}
-				sb.WriteString("\n")
-			}
-			return mcp.NewToolResultText(sb.String()), nil
+			// Generate structured Markdown using shared converter
+			md := convertAXTreeToMarkdown(tree, Page)
+			return mcp.NewToolResultText(md), nil
 		},
 	)
 
