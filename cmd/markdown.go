@@ -32,125 +32,33 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 
 	var sb strings.Builder
 
-	// recursive renderer
-	var render func(nodeID proto.AccessibilityAXNodeID, depth int)
-	render = func(nodeID proto.AccessibilityAXNodeID, depth int) {
-		node, ok := idMap[nodeID]
-		if !ok {
-			return
-		}
+	// flat render based on quax CLI output
+	for _, node := range tree.Nodes {
 		if node.Ignored {
-			// descend into ignored nodes’ children
-			for _, cid := range node.ChildIDs {
-				render(cid, depth)
-			}
-			return
+			continue
 		}
-
-		// grab the node’s accessible name (if any)
-		name := ""
-		if node.Name != nil {
-			name = node.Name.Value.String()
-		}
-
 		role := node.Role.Value.String()
-
-		// helper to fetch an attribute (href/src) for links/images
-		fetchAttr := func(attr string) string {
-			var val string
-			if node.BackendDOMNodeID != proto.DOMBackendNodeID(0) {
-				resolver := proto.DOMResolveNode{
-					BackendNodeID: proto.DOMBackendNodeID(node.BackendDOMNodeID),
-				}
-				if res, err := resolver.Call(page); err == nil {
-					if el, err2 := page.ElementFromObject(res.Object); err2 == nil {
-						if a, err := el.Attribute(attr); err == nil {
-							val = *a
-						}
-					}
-				}
-			}
-			return val
-		}
-
-		indent := strings.Repeat("  ", depth)
-
 		switch role {
-		case "heading":
-			sb.WriteString("# " + name + "\n\n")
-
+		case "LineBreak":
+		case "generic":
+		case "InlineTextBox":
 		case "paragraph":
-			if name != "" {
-				sb.WriteString(name + "\n\n")
-			}
-			// fall-through so we recurse into the text children
-
-		// explicit handling of text nodes
-		case "staticText", "StaticText", "inlineTextBox", "InlineTextBox", "labelText", "LabelText":
-			if name != "" {
-				sb.WriteString(indent + name + "\n\n")
-			}
-			return
-
-		case "list":
-			// just recurse; listitems will render themselves
-			for _, cid := range node.ChildIDs {
-				render(cid, depth)
-			}
-			return
-
+			sb.WriteString("\n" + node.Name.Value.String() + "\n")
+		case "separator":
+			sb.WriteString("---\n")
 		case "listitem":
-			sb.WriteString(indent + "- " + name + "\n")
-			// handle any nested lists/items
-			for _, cid := range node.ChildIDs {
-				render(cid, depth+1)
-			}
-			return
-
-		// add explicit handling for hard line breaks
-		case "lineBreak", "LineBreak":
-			sb.WriteString("\n")
-			return
-
+			sb.WriteString("- \n")
 		case "link":
-			href := fetchAttr("href")
-			if href == "" {
-				// fallback to text only if no href
-				sb.WriteString("[" + name + "]" + "\n\n")
-			} else {
-				sb.WriteString(fmt.Sprintf("[%s](%s)\n\n", name, href))
-			}
-			return
-
-		case "image", "img":
-			src := fetchAttr("src")
-			// alt text = name
-			sb.WriteString(fmt.Sprintf("![%s](%s)\n\n", name, src))
-			return
-
-		case "blockquote":
-			for _, line := range strings.Split(name, "\n") {
-				sb.WriteString("> " + line + "\n")
-			}
-			sb.WriteString("\n")
-			return
-
-		case "pre":
-			// code block
-			content := name
-			sb.WriteString("```\n" + content + "\n```\n\n")
-			return
-
+			sb.WriteString(role + "(" + fmt.Sprint(node.BackendDOMNodeID) + ") ")
+		case "button", "textbox":
+			sb.WriteString(role + "(" + fmt.Sprint(node.BackendDOMNodeID) + ") " + node.Name.Value.String() + "\n")
+		case "LabelText":
+			sb.WriteString("Label: ")
+		case "StaticText":
+			sb.WriteString(node.Name.Value.String() + "\n")
 		default:
-			// any other container or region: just recurse
-			for _, cid := range node.ChildIDs {
-				render(cid, depth)
-			}
-			return
+			sb.WriteString(role + ": ")
 		}
 	}
-
-	// emit document starting at root
-	render(rootID, 0)
 	return sb.String()
 }
