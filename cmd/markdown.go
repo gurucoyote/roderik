@@ -83,7 +83,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 			if name != "" {
 				sb.WriteString(name + "\n\n")
 			}
-			return // do NOT recurse into static-text children
+			// fall-through so we recurse into the text children
 
 		// explicit handling of text nodes
 		case "staticText", "StaticText", "inlineTextBox", "InlineTextBox", "labelText", "LabelText":
