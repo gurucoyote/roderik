@@ -113,6 +113,7 @@ var markdownCmd = &cobra.Command{
 					fmt.Println("Error loading URL:", err)
 					return
 				}
+				Page = page
 				CurrentElement = page.MustElement("html")
 			}
 		}
