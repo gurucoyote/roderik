@@ -26,7 +26,7 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 		}
 	}
 	// fallback if we never saw a true ParentID==0 (e.g. subtree starts mid-tree)
-	if rootID == 0 && len(tree.Nodes) > 0 {
+	if rootID == proto.AccessibilityAXNodeID(0) && len(tree.Nodes) > 0 {
 		rootID = tree.Nodes[0].NodeID
 	}
 
