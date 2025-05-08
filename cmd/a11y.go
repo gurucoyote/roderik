@@ -105,31 +105,42 @@ var markdownCmd = &cobra.Command{
 	Use:   "to_markdown",
 	Short: "Convert the current element or page into a Markdown document",
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("to_markdown: args", args)
 		if len(args) > 0 {
 			url := args[0]
+			fmt.Println("to_markdown: received URL:", url)
 			if isValidURL(url) {
+				fmt.Println("to_markdown: URL valid, loading page")
 				var err error
 				Page, err = LoadURL(url)
 				if err != nil {
 					fmt.Println("Error loading URL:", err)
 					return
 				}
+				fmt.Println("to_markdown: loaded page successfully")
 				CurrentElement = Page.MustElement("html")
+				fmt.Println("to_markdown: set CurrentElement to html")
+			} else {
+				fmt.Println("to_markdown: invalid URL, skipping load")
 			}
 		}
 		if !hasCurrentElement() {
+			fmt.Println("to_markdown: no current element; aborting")
 			return
 		}
+		fmt.Println("to_markdown: describing element")
 		props, err := CurrentElement.Describe(0, false)
 		if err != nil {
 			fmt.Println("Error describing element:", err)
 			return
 		}
+		fmt.Println("to_markdown: querying AX tree")
 		tree, err := proto.AccessibilityQueryAXTree{BackendNodeID: props.BackendNodeID}.Call(Page)
 		if err != nil {
 			fmt.Println("Error querying accessibility tree:", err)
 			return
 		}
+		fmt.Println("to_markdown: converting tree to markdown")
 		md := convertAXTreeToMarkdown(tree, Page)
 		fmt.Println(md)
 	},
