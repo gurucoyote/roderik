@@ -108,12 +108,13 @@ var markdownCmd = &cobra.Command{
 		if len(args) > 0 {
 			url := args[0]
 			if isValidURL(url) {
-				Page, err := LoadURL(url)
+				p, err := LoadURL(url)
 				if err != nil {
 					fmt.Println("Error loading URL:", err)
 					return
 				}
-				CurrentElement = page.MustElement("html")
+				Page = p
+				CurrentElement = Page.MustElement("html")
 			}
 		}
 		if !hasCurrentElement() {
