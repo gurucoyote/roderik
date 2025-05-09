@@ -331,7 +331,7 @@ func findChromeOnWindows() (string, error) {
 		return "", fmt.Errorf("could not find Chrome path in registry output: %q", out)
 	}
 
-	// convert to WSL path
+	// convert to WSL path *only* to check that the binary really exists
 	wslCmd := exec.Command("wslpath", "-u", winPath)
 	wslOut, err := wslCmd.Output()
 	if err != nil {
@@ -345,7 +345,8 @@ func findChromeOnWindows() (string, error) {
 	if _, err := os.Stat(linuxPath); err != nil {
 		return "", fmt.Errorf("chrome.exe not found at %s: %w", linuxPath, err)
 	}
-	return linuxPath, nil
+	// return the *Windows* path so `cmd.exe start` can launch it
+	return winPath, nil
 }
 
 var WinChromeCmd = &cobra.Command{
