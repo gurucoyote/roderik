@@ -297,14 +297,13 @@ var ExitCmd = &cobra.Command{
 }
 
 func findChromeOnWindows() (string, error) {
-	// build the reg query
+	// query the Windows registry for the Chrome path
+	// reg.exe is automatically on PATH under WSL2
 	regCmd := exec.Command(
-		"cmd.exe", "/C",
-		`reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe" /ve`,
+		"reg", "query",
+		`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe`,
+		"/ve",
 	)
-	// force a Linux-local working directory (avoids UNC paths)
-	regCmd.Dir = `/mnt/c/`
-
 	out, err := regCmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf(
