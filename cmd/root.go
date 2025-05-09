@@ -312,11 +312,24 @@ func findChromeOnWindows() (string, error) {
 		)
 	}
 
-	fields := strings.Fields(string(out))
-	if len(fields) < 3 {
-		return "", fmt.Errorf("unexpected reg query output: %q", out)
+	// Look for the line that contains "REG_SZ" and split it there.
+	// reg query output looks like:
+	//    (Default)    REG_SZ    C:\Program Files\...\chrome.exe
+	var winPath string
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "REG_SZ") {
+			parts := strings.Fields(line)
+			if len(parts) >= 3 {
+				// Join everything after the first two tokens to preserve spaces in path
+				winPath = strings.Join(parts[2:], " ")
+			}
+			break
+		}
 	}
-	winPath := strings.Join(fields[2:], " ")
+	if winPath == "" {
+		return "", fmt.Errorf("could not find Chrome path in registry output: %q", out)
+	}
 
 	// convert to WSL path
 	wslCmd := exec.Command("wslpath", "-u", winPath)
