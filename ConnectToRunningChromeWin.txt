@@ -1,0 +1,17 @@
+To connect Roderik (running in WSL2) to a Chrome browser on your Windows host:
+
+1. Launch Chrome on Windows with a publicly bound debug port:
+   "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --user-data-dir="C:\Users\<you>\AppData\Local\Google\Chrome\User Data\WSL2"
+
+2. Discover the Windows host IP from WSL2:
+   HOST_IP=$(grep -m1 nameserver /etc/resolv.conf | awk '{print $2}')
+   echo "Windows host is at $HOST_IP"
+
+3. Retrieve the WebSocket debugger URL:
+   WSURL=$(curl -s http://$HOST_IP:9222/json/version | jq -r .webSocketDebuggerUrl)
+
+4. Run Roderik attached to that browser:
+   roderik --remote $WSURL https://example.com
+
+On recent Windows builds WSL2 forwards localhost, so you may be able to use:
+   roderik --remote ws://127.0.0.1:9222/devtools/browser/<id> https://example.com
