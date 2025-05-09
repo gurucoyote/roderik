@@ -16,6 +16,7 @@ import (
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
+	"github.com/go-rod/stealth"
 )
 
 func GetUserInput(prompt string) string {
@@ -37,6 +38,7 @@ func AskForConfirmation(prompt string) bool {
 var ShowNetActivity bool
 var Interactive bool
 var Verbose bool
+var Stealth bool // Enable stealth mode
 var IgnoreCertErrors bool // New flag for ignoring certificate errors
 
 type EventLog struct {
@@ -75,7 +77,11 @@ var RootCmd = &cobra.Command{
 				fmt.Println("Error preparing browser:", err)
 				return
 			}
-			Page = Browser.MustPage("about:blank")
+			if Stealth {
+				Page = stealth.MustPage(Browser)
+			} else {
+				Page = Browser.MustPage("about:blank")
+			}
 		}
 		// fmt.Println(Page.MustInfo())
 	},
@@ -291,6 +297,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
 	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose mode")
 	RootCmd.PersistentFlags().BoolVarP(&IgnoreCertErrors, "ignore-cert-errors", "k", false, "Ignore certificate errors") // Register the new flag
+	RootCmd.PersistentFlags().BoolVarP(&Stealth, "stealth", "s", false, "Enable stealth mode")
 
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)
