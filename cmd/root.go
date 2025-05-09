@@ -17,6 +17,11 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
 	"github.com/go-rod/stealth"
+	"bytes"
+	"io/ioutil"
+	"net/http"
+	"syscall"
+	"time"
 )
 
 func GetUserInput(prompt string) string {
@@ -292,6 +297,69 @@ var ExitCmd = &cobra.Command{
 	},
 }
 
+var WinChromeCmd = &cobra.Command{
+	Use:   "win-chrome",
+	Short: "Launch and attach to Windows Chrome from WSL2",
+	Long:  `Launches Chrome on Windows via WSL2, connects to it, and navigates to https://traumwind.de.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// detect WSL2
+		data, _ := os.ReadFile("/proc/version")
+		if !bytes.Contains(data, []byte("Microsoft")) {
+			fmt.Println("Not running under WSL2, aborting win-chrome command")
+			return
+		}
+		// get host IP
+		resolv, _ := os.ReadFile("/etc/resolv.conf")
+		var hostIP string
+		for _, line := range strings.Split(string(resolv), "\n") {
+			if strings.HasPrefix(line, "nameserver") {
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					hostIP = parts[1]
+					break
+				}
+			}
+		}
+		if hostIP == "" {
+			fmt.Println("Could not determine host IP")
+			return
+		}
+		// launch Windows Chrome
+		winChrome := `C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`
+		args := []string{"/C", "start", "", winChrome, "--remote-debugging-port=9222", "--remote-debugging-address=0.0.0.0", "--user-data-dir=C:\\Users\\<you>\\AppData\\Local\\Google\\Chrome\\User Data\\WSL2", "--no-first-run", "--no-default-browser-check"}
+		cmdExe := exec.Command("cmd.exe", args...)
+		cmdExe.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		if err := cmdExe.Start(); err != nil {
+			fmt.Println("Failed to start Windows Chrome:", err)
+			return
+		}
+		// poll for debugger
+		var wsURL string
+		for i := 0; i < 10; i++ {
+			resp, err := http.Get(fmt.Sprintf("http://%s:9222/json/version", hostIP))
+			if err == nil {
+				body, _ := ioutil.ReadAll(resp.Body)
+				resp.Body.Close()
+				var info map[string]interface{}
+				if json.Unmarshal(body, &info) == nil {
+					if url, ok := info["webSocketDebuggerUrl"].(string); ok {
+						wsURL = url
+						break
+					}
+				}
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		if wsURL == "" {
+			fmt.Println("Could not get WebSocket URL")
+			return
+		}
+		browser := rod.New().ControlURL(wsURL).MustConnect()
+		page := browser.MustPage("about:blank")
+		page.Navigate("https://traumwind.de")
+	},
+}
+
 func init() {
 	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
 	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
@@ -302,4 +370,5 @@ func init() {
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)
 	RootCmd.AddCommand(ReloadCmd)
+	RootCmd.AddCommand(WinChromeCmd)
 }
