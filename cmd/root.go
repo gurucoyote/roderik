@@ -303,7 +303,7 @@ func findChromeOnWindows() (string, error) {
 		`reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe" /ve`,
 	)
 	// force a Linux-local working directory (avoids UNC paths)
-	regCmd.Dir = `/`
+	regCmd.Dir = `/mnt/c/`
 
 	out, err := regCmd.CombinedOutput()
 	if err != nil {
