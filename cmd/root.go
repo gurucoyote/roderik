@@ -17,7 +17,7 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
 	"github.com/go-rod/stealth"
-	"bytes"
+	// "bytes"
 	"io/ioutil"
 	"net/http"
 	"time"
