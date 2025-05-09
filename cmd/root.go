@@ -296,6 +296,36 @@ var ExitCmd = &cobra.Command{
 	},
 }
 
+func findChromeOnWindows() (string, error) {
+	out, err := exec.Command(
+		"cmd.exe", "/C",
+		`reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe" /ve`,
+	).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to query registry: %w (output=%q)", err, out)
+	}
+
+	fields := strings.Fields(string(out))
+	if len(fields) < 3 {
+		return "", fmt.Errorf("unexpected reg query output: %q", out)
+	}
+	winPath := fields[2]
+
+	wslOut, err := exec.Command("wslpath", "-u", winPath).Output()
+	if err != nil {
+		return "", fmt.Errorf("wslpath conversion failed: %w", err)
+	}
+	linuxPath := strings.TrimSpace(string(wslOut))
+	if linuxPath == "" {
+		return "", fmt.Errorf("empty path after wslpath conversion")
+	}
+
+	if _, err := os.Stat(linuxPath); err != nil {
+		return "", fmt.Errorf("chrome.exe not found at %s: %w", linuxPath, err)
+	}
+	return linuxPath, nil
+}
+
 var WinChromeCmd = &cobra.Command{
 	Use:   "win-chrome",
 	Short: "Launch and attach to Windows Chrome from WSL2",
@@ -324,7 +354,11 @@ var WinChromeCmd = &cobra.Command{
 			return
 		}
 		// launch Windows Chrome
-		winChrome := `C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`
+		winChrome, err := findChromeOnWindows()
+		if err != nil {
+			fmt.Println("Could not locate Windows Chrome:", err)
+			return
+		}
 		chromeArgs := []string{"/C", "start", "", winChrome, "--remote-debugging-port=9222", "--remote-debugging-address=0.0.0.0", "--user-data-dir=C:\\Users\\<you>\\AppData\\Local\\Google\\Chrome\\User Data\\WSL2", "--no-first-run", "--no-default-browser-check"}
 		cmdExe := exec.Command("cmd.exe", chromeArgs...)
 		if err := cmdExe.Start(); err != nil {
