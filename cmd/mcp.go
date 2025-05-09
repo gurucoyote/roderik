@@ -86,8 +86,15 @@ func runMCP(cmd *cobra.Command, args []string) {
 	s.AddTool(
 		mcp.NewTool(
 			"get_html",
-			mcp.WithDescription("Get HTML of the current element, or load and return HTML from an optional URL. Use this if you really need the full html source of a page, otherwise prefer to_markdown."),
-			mcp.WithString("url", mcp.Description("optional URL to load and get HTML from; if provided, overrides the current element")),
+			mcp.WithDescription(
+				"Get the raw HTML of the current element (or an optional URL). " +
+				"Beware: this returns the full source and can be very large. " +
+				"In most cases, use \"to_markdown\" for a more concise, token-efficient output.",
+			),
+			mcp.WithString(
+				"url",
+				mcp.Description("optional URL to load first; overrides the current element"),
+			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
@@ -141,8 +148,15 @@ func runMCP(cmd *cobra.Command, args []string) {
 	s.AddTool(
 		mcp.NewTool(
 			"to_markdown",
-			mcp.WithDescription("Convert the current page/element (or an optional URL) into a full Markdown documen. Prefer this tool to preserve tokens.t"),
-			mcp.WithString("url", mcp.Description("optional URL to load and convert; if provided, overrides the current element")),
+			mcp.WithDescription(
+				"Convert the current page/element (or an optional URL) into a structured Markdown document. " +
+				"This produces a well-formatted, token-efficient summary. " +
+				"Use this instead of \"get_html\" unless you specifically need raw HTML.",
+			),
+			mcp.WithString(
+				"url",
+				mcp.Description("optional URL to load first; overrides the current element"),
+			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			// if a URL was passed in, load it first (and reset CurrentElement to <body>)
