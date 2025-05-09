@@ -8,6 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/chzyer/readline v1.5.1
 	github.com/go-rod/rod v0.116.2
+	github.com/go-rod/stealth v0.4.9
 	github.com/mark3labs/mcp-go v0.24.1
 	github.com/spf13/cobra v1.8.1
 	github.com/ysmood/gson v0.7.3

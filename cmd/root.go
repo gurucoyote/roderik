@@ -300,7 +300,7 @@ func findChromeOnWindows() (string, error) {
 	// query the Windows registry for the Chrome path
 	// reg.exe is automatically on PATH under WSL2
 	regCmd := exec.Command(
-		"reg", "query",
+		"reg.exe", "query",
 		`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe`,
 		"/ve",
 	)
