@@ -297,12 +297,21 @@ var ExitCmd = &cobra.Command{
 }
 
 func findChromeOnWindows() (string, error) {
-	out, err := exec.Command(
+	// build the reg query
+	regCmd := exec.Command(
 		"cmd.exe", "/C",
 		`reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe" /ve`,
-	).CombinedOutput()
+	)
+	// force a local Windows system directory so cmd.exe
+	// isn’t started on a UNC path (which it rejects)
+	regCmd.Dir = `C:\Windows\System32`
+
+	out, err := regCmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("failed to query registry: %w (output=%q)", err, out)
+		return "", fmt.Errorf(
+			"failed to query registry: %w (output=%q)",
+			err, out,
+		)
 	}
 
 	fields := strings.Fields(string(out))
@@ -311,7 +320,9 @@ func findChromeOnWindows() (string, error) {
 	}
 	winPath := fields[2]
 
-	wslOut, err := exec.Command("wslpath", "-u", winPath).Output()
+	// convert to WSL path
+	wslCmd := exec.Command("wslpath", "-u", winPath)
+	wslOut, err := wslCmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("wslpath conversion failed: %w", err)
 	}
