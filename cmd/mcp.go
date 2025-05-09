@@ -77,7 +77,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			if err != nil {
 				return nil, fmt.Errorf("load_url failed: %w", err)
 			}
-			CurrentElement = page.MustElement("html")
+			CurrentElement = page.MustElement("body")
 			msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
 			return mcp.NewToolResultText(msg), nil
 		},
@@ -86,7 +86,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	s.AddTool(
 		mcp.NewTool(
 			"get_html",
-			mcp.WithDescription("Get HTML of the current element, or load and return HTML from an optional URL"),
+			mcp.WithDescription("Get HTML of the current element, or load and return HTML from an optional URL. Use this if you really need the full html source of a page, otherwise prefer to_markdown."),
 			mcp.WithString("url", mcp.Description("optional URL to load and get HTML from; if provided, overrides the current element")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -141,17 +141,17 @@ func runMCP(cmd *cobra.Command, args []string) {
 	s.AddTool(
 		mcp.NewTool(
 			"to_markdown",
-			mcp.WithDescription("Convert the current page/element (or an optional URL) into a full Markdown document"),
+			mcp.WithDescription("Convert the current page/element (or an optional URL) into a full Markdown documen. Prefer this tool to preserve tokens.t"),
 			mcp.WithString("url", mcp.Description("optional URL to load and convert; if provided, overrides the current element")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			// if a URL was passed in, load it first (and reset CurrentElement to <html>)
+			// if a URL was passed in, load it first (and reset CurrentElement to <body>)
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
 				page, err := LoadURL(raw)
 				if err != nil {
 					return nil, fmt.Errorf("to_markdown failed to load url %q: %w", raw, err)
 				}
-				CurrentElement = page.MustElement("html")
+				CurrentElement = page.MustElement("body")
 			}
 			if CurrentElement == nil {
 				return nil, fmt.Errorf("no element selected: use load_url and element-selection tools first")
