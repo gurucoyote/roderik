@@ -316,7 +316,7 @@ func findChromeOnWindows() (string, error) {
 	if len(fields) < 3 {
 		return "", fmt.Errorf("unexpected reg query output: %q", out)
 	}
-	winPath := fields[2]
+	winPath := strings.Join(fields[2:], " ")
 
 	// convert to WSL path
 	wslCmd := exec.Command("wslpath", "-u", winPath)
