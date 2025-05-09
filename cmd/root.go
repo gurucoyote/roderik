@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"syscall"
 	"time"
 )
 
@@ -326,9 +325,8 @@ var WinChromeCmd = &cobra.Command{
 		}
 		// launch Windows Chrome
 		winChrome := `C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`
-		args := []string{"/C", "start", "", winChrome, "--remote-debugging-port=9222", "--remote-debugging-address=0.0.0.0", "--user-data-dir=C:\\Users\\<you>\\AppData\\Local\\Google\\Chrome\\User Data\\WSL2", "--no-first-run", "--no-default-browser-check"}
-		cmdExe := exec.Command("cmd.exe", args...)
-		cmdExe.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		chromeArgs := []string{"/C", "start", "", winChrome, "--remote-debugging-port=9222", "--remote-debugging-address=0.0.0.0", "--user-data-dir=C:\\Users\\<you>\\AppData\\Local\\Google\\Chrome\\User Data\\WSL2", "--no-first-run", "--no-default-browser-check"}
+		cmdExe := exec.Command("cmd.exe", chromeArgs...)
 		if err := cmdExe.Start(); err != nil {
 			fmt.Println("Failed to start Windows Chrome:", err)
 			return
