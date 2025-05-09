@@ -87,9 +87,9 @@ func runMCP(cmd *cobra.Command, args []string) {
 		mcp.NewTool(
 			"get_html",
 			mcp.WithDescription(
-				"Get the raw HTML of the current element (or an optional URL). " +
-				"Beware: this returns the full source and can be very large. " +
-				"In most cases, use \"to_markdown\" for a more concise, token-efficient output.",
+				"Get the raw HTML of the current element (or an optional URL). "+
+					"Beware: this returns the full source and can be very large. "+
+					"In most cases, use \"to_markdown\" for a more concise, token-efficient output.",
 			),
 			mcp.WithString(
 				"url",
@@ -149,9 +149,9 @@ func runMCP(cmd *cobra.Command, args []string) {
 		mcp.NewTool(
 			"to_markdown",
 			mcp.WithDescription(
-				"Convert the current page/element (or an optional URL) into a structured Markdown document. " +
-				"This produces a well-formatted, token-efficient summary. " +
-				"Use this instead of \"get_html\" unless you specifically need raw HTML.",
+				"Convert the current page/element (or an optional URL) into a structured Markdown document. "+
+					"This produces a well-formatted, token-efficient summary. "+
+					"Use this instead of \"get_html\" unless you specifically need raw HTML.",
 			),
 			mcp.WithString(
 				"url",
