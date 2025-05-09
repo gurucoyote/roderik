@@ -301,12 +301,12 @@ var WinChromeCmd = &cobra.Command{
 	Short: "Launch and attach to Windows Chrome from WSL2",
 	Long:  `Launches Chrome on Windows via WSL2, connects to it, and navigates to https://traumwind.de.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// detect WSL2
-		data, _ := os.ReadFile("/proc/version")
-		if !bytes.Contains(data, []byte("Microsoft")) {
-			fmt.Println("Not running under WSL2, aborting win-chrome command")
-			return
-		}
+		// detect WSL2 (skipped for now)
+		// data, _ := os.ReadFile("/proc/version")
+		// if !bytes.Contains(data, []byte("Microsoft")) {
+		// 	fmt.Println("Not running under WSL2, aborting win-chrome command")
+		// 	return
+		// }
 		// get host IP
 		resolv, _ := os.ReadFile("/etc/resolv.conf")
 		var hostIP string
