@@ -67,6 +67,7 @@ func (l *EventLog) Display() {
 var Browser rod.Browser
 var Page *rod.Page
 var CurrentElement *rod.Element
+var Desktop bool // Indicates we have attached to a desktop Chrome instance
 
 var RootCmd = &cobra.Command{
 	Use:   "roderik",
@@ -77,7 +78,7 @@ var RootCmd = &cobra.Command{
 		// TODO the win-chrome must set Desktop bloabl bool var
 		// TODO if that is set, ignore the browser prep, also the global Page should not be nil anymore
 		// If we’re attaching to an existing Windows Chrome, skip auto-launch headless preparation
-		if cmd.Name() == "win-chrome" {
+		if cmd.Name() == "win-chrome" || Desktop {
 			return
 		}
 
