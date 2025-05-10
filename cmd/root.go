@@ -497,11 +497,17 @@ var WinChromeCmd = &cobra.Command{
 		// 5) finally connect
 		Browser = rod.New().
 			ControlURL(wsURL).
-			Timeout(5 * time.Second).
+			Timeout(10 * time.Second). // give us a bit more head room
 			MustConnect()
 
+		// Navigate and wait for full load
 		Page = Browser.MustPage("about:blank")
 		Page.MustNavigate("https://traumwind.de")
+		Page.MustWaitLoad().MustWaitIdle()
+
+		// prime the default current element to <body>
+		CurrentElement = Page.MustElement("body")
+
 		Desktop = true
 	},
 }
