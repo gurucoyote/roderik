@@ -64,7 +64,7 @@ func (l *EventLog) Display() {
 	}
 }
 
-var Browser rod.Browser
+var Browser *rod.Browser
 var Page *rod.Page
 var CurrentElement *rod.Element
 var Desktop bool // Indicates we have attached to a desktop Chrome instance
@@ -84,11 +84,12 @@ var RootCmd = &cobra.Command{
 
 		if Page == nil {
 			// Prepare the browser
-			Browser, err := PrepareBrowser()
+			tmp, err := PrepareBrowser()
 			if err != nil {
 				fmt.Println("Error preparing browser:", err)
 				return
 			}
+			Browser = tmp
 			if Stealth {
 				Page = stealth.MustPage(Browser)
 			} else {
