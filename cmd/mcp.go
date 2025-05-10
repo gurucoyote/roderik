@@ -101,6 +101,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL get_html CALLED args=%#v", req.Params.Arguments)
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
 				// loading URL will reset current element to <html>
 				page, err := LoadURL(raw)
@@ -145,6 +146,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			// invoke the same logic as the CLI
 			out, err := searchDuck(q, n)
 			if err != nil {
+				log.Printf("[MCP] TOOL duck ERROR: %v", err)
 				return nil, fmt.Errorf("duck tool failed: %w", err)
 			}
 			log.Printf("[MCP] TOOL duck RESULT first100=%q", out[:min(len(out), 100)])
@@ -167,6 +169,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL to_markdown CALLED args=%#v", req.Params.Arguments)
 			// if a URL was passed in, load it first (and reset CurrentElement to <body>)
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
 				page, err := LoadURL(raw)
