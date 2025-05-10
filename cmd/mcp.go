@@ -50,6 +50,7 @@ type ToolSpec struct {
 func runMCP(cmd *cobra.Command, args []string) {
 	log.SetOutput(os.Stderr)
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.Printf("[MCP] starting server name=%q version=%q", "roderik", "1.0.0")
 
 	f, err := os.OpenFile(mcpLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -72,6 +73,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithString("url", mcp.Required(), mcp.Description("the URL of the webpage to load")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL load_url CALLED args=%#v", req.Params.Arguments)
 			url, _ := req.Params.Arguments["url"].(string)
 			page, err := LoadURL(url)
 			if err != nil {
@@ -79,7 +81,9 @@ func runMCP(cmd *cobra.Command, args []string) {
 			}
 			CurrentElement = page.MustElement("body")
 			msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
-			return mcp.NewToolResultText(msg), nil
+			result := mcp.NewToolResultText(msg)
+			log.Printf("[MCP] TOOL load_url RESULT: %q", msg)
+			return result, nil
 		},
 	)
 
@@ -109,7 +113,9 @@ func runMCP(cmd *cobra.Command, args []string) {
 				return nil, fmt.Errorf("no page loaded – call load_url first or provide url")
 			}
 			html := CurrentElement.MustHTML()
-			return mcp.NewToolResultText(html), nil
+			result := mcp.NewToolResultText(html)
+			log.Printf("[MCP] TOOL get_html RESULT length=%d", len(html))
+			return result, nil
 		},
 	)
 
@@ -129,6 +135,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithNumber("num", mcp.Description("how many results to return (default 20)")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL duck CALLED args=%#v", req.Params.Arguments)
 			// unwrap arguments
 			q, _ := req.Params.Arguments["query"].(string)
 			n := numResults
@@ -140,6 +147,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			if err != nil {
 				return nil, fmt.Errorf("duck tool failed: %w", err)
 			}
+			log.Printf("[MCP] TOOL duck RESULT first100=%q", out[:min(len(out), 100)])
 			return mcp.NewToolResultText(out), nil
 		},
 	)
@@ -182,6 +190,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			}
 			// Generate structured Markdown using shared converter
 			md := convertAXTreeToMarkdown(tree, Page)
+			log.Printf("[MCP] TOOL to_markdown RESULT length=%d", len(md))
 			return mcp.NewToolResultText(md), nil
 		},
 	)
@@ -189,4 +198,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 	if err := server.ServeStdio(s); err != nil {
 		log.Printf("MCP server error: %v", err)
 	}
+}
+
+// helper function for logging large results
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
