@@ -336,7 +336,11 @@ func findChromeOnWindows() (string, error) {
 		return "", fmt.Errorf("could not find Chrome path in registry output: %q", out)
 	}
 
-	// convert to WSL path *only* to check that the binary really exists
+	// If this binary is itself running on Windows, assume winPath is valid
+	if runtime.GOOS == "windows" {
+		return winPath, nil
+	}
+	// Under WSL/Linux, convert Windows path to WSL path and verify it exists
 	wslCmd := exec.Command("wslpath", "-u", winPath)
 	wslOut, err := wslCmd.Output()
 	if err != nil {
@@ -346,7 +350,6 @@ func findChromeOnWindows() (string, error) {
 	if linuxPath == "" {
 		return "", fmt.Errorf("empty path after wslpath conversion")
 	}
-
 	if _, err := os.Stat(linuxPath); err != nil {
 		return "", fmt.Errorf("chrome.exe not found at %s: %w", linuxPath, err)
 	}
