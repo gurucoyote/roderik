@@ -17,7 +17,7 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
 	"github.com/go-rod/stealth"
-	// "bytes"
+	"bytes"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -354,27 +354,43 @@ var WinChromeCmd = &cobra.Command{
 	Short: "Launch and attach to Windows Chrome from WSL2",
 	Long:  `Launches Chrome on Windows via WSL2, connects to it, and navigates to https://traumwind.de.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// 1) figure out Windows host IP
-		resolv, err := os.ReadFile("/etc/resolv.conf")
-		if err != nil {
-			fmt.Println("cannot read resolv.conf:", err)
-			return
-		}
-		var hostIP string
-		for _, line := range strings.Split(string(resolv), "\n") {
-			if strings.HasPrefix(line, "nameserver") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					hostIP = parts[1]
+		// 1) detect WSL2 vs native Windows and prepare hosts list
+		isWSL := false
+		if runtime.GOOS != "windows" {
+			if data, err := os.ReadFile("/proc/version"); err == nil {
+				if bytes.Contains(data, []byte("Microsoft")) {
+					isWSL = true
 				}
-				break
 			}
 		}
-		if hostIP == "" {
-			fmt.Println("could not determine host IP")
-			return
+		var hosts []string
+		if isWSL {
+			// WSL2: derive host IP from nameserver
+			resolv, err := os.ReadFile("/etc/resolv.conf")
+			if err != nil {
+				fmt.Println("cannot read resolv.conf:", err)
+				return
+			}
+			var hostIP string
+			for _, line := range strings.Split(string(resolv), "\n") {
+				if strings.HasPrefix(line, "nameserver") {
+					parts := strings.Fields(line)
+					if len(parts) >= 2 {
+						hostIP = parts[1]
+					}
+					break
+				}
+			}
+			if hostIP == "" {
+				fmt.Println("could not determine host IP")
+				return
+			}
+			fmt.Println("using host IP =", hostIP)
+			hosts = []string{hostIP, "127.0.0.1", "localhost"}
+		} else {
+			// native Windows: use loopback only
+			hosts = []string{"127.0.0.1"}
 		}
-		fmt.Println("using host IP =", hostIP)
 
 		// 2) launch Windows Chrome
 		winChrome, err := findChromeOnWindows()
@@ -416,7 +432,7 @@ var WinChromeCmd = &cobra.Command{
 			maxAttempts = 20
 			pause       = 300 * time.Millisecond
 		)
-		hosts := []string{hostIP, "127.0.0.1", "localhost"}
+		// hosts list initialized above
 		for _, h := range hosts {
 			for i := 0; i < maxAttempts; i++ {
 				time.Sleep(pause)
