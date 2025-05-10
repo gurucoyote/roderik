@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"context"
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -13,12 +13,12 @@ import (
 	"strings"
 	"sync"
 
+	"bytes"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
-	"github.com/spf13/cobra"
 	"github.com/go-rod/stealth"
-	"bytes"
+	"github.com/spf13/cobra"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -43,7 +43,7 @@ func AskForConfirmation(prompt string) bool {
 var ShowNetActivity bool
 var Interactive bool
 var Verbose bool
-var Stealth bool // Enable stealth mode
+var Stealth bool          // Enable stealth mode
 var IgnoreCertErrors bool // New flag for ignoring certificate errors
 
 type EventLog struct {
@@ -76,8 +76,6 @@ var RootCmd = &cobra.Command{
 	Long:  `Roderik is a command-line tool that allows you to navigate, inspect, and interact with elements on a webpage. It uses the Go Rod library for web scraping and automation. You can use it to walk through the DOM, get information about elements, and perform actions like clicking or typing.`,
 	Args:  cobra.MinimumNArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// TODO the win-chrome must set Desktop bloabl bool var
-		// TODO if that is set, ignore the browser prep, also the global Page should not be nil anymore
 		// If we’re attaching to an existing Windows Chrome, skip auto-launch headless preparation
 		if cmd.Name() == "win-chrome" || Desktop {
 			return
@@ -98,11 +96,6 @@ var RootCmd = &cobra.Command{
 			}
 		}
 		// fmt.Println(Page.MustInfo())
-		// enable Accessibility domain so AX commands (quax/to_markdown) work over remote-debug
-		_, err := proto.AccessibilityEnable{}.Call(Page)
-		if err != nil {
-			fmt.Println("Error enabling Accessibility domain:", err)
-		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// set interactive mode for this root command by default

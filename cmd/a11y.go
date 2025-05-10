@@ -28,6 +28,11 @@ var quaxCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
+		// enable Accessibility domain so AX commands (quax/to_markdown) work over remote-debug
+		err := proto.AccessibilityEnable{}.Call(Page)
+		if err != nil {
+			fmt.Println("Error enabling Accessibility domain:", err)
+		}
 		// Get the element's properties
 		elementProperties, err := CurrentElement.Describe(0, false) // depth:0, pierce:false
 		if err != nil {
@@ -120,6 +125,11 @@ var markdownCmd = &cobra.Command{
 		}
 		if !hasCurrentElement() {
 			return
+		}
+		// enable Accessibility domain so AX commands (quax/to_markdown) work over remote-debug
+		err := proto.AccessibilityEnable{}.Call(Page)
+		if err != nil {
+			fmt.Println("Error enabling Accessibility domain:", err)
 		}
 		props, err := CurrentElement.Describe(0, false)
 		if err != nil {
