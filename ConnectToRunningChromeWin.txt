@@ -3,3 +3,23 @@ Connecting Roderik (in WSL2) to a Chrome Instance on Windows
 ------------------------------------------------------------
 
 Overview
+
+Manual Troubleshooting Tips:
+1) Inspect Chrome’s command-line:
+   - Open the Chrome window and navigate to chrome://version
+   - In “Command Line” you’ll see exactly which flags (--remote-debugging-port, --remote-debugging-address, --user-data-dir, etc.) Chrome was launched with.
+
+2) Check which TCP address/port Chrome is listening on (run in Windows cmd.exe or PowerShell):
+   netstat -an | findstr 9222
+   # Look for a line like:
+   #   TCP    0.0.0.0:9222    0.0.0.0:0    LISTENING
+
+3) (Optional) Query Windows via PowerShell from inside WSL:
+   powershell.exe -Command "Get-NetTCPConnection -LocalPort 9222 | Format-Table LocalAddress,State,OwningProcess"
+   powershell.exe -Command "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Select ProcessId,CommandLine"
+
+4) Test manually from WSL:
+   curl -v http://$HOST_IP:9222/json/version
+   curl -v http://127.0.0.1:9222/json/version
+
+If you discover Chrome only binds to 127.0.0.1, use localhost; if it binds to 0.0.0.0, use your WSL host IP from /etc/resolv.conf.
