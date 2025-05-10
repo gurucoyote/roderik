@@ -98,6 +98,10 @@ var RootCmd = &cobra.Command{
 			}
 		}
 		// fmt.Println(Page.MustInfo())
+		// enable Accessibility domain so AX commands (quax/to_markdown) work over remote-debug
+		if _, err := proto.AccessibilityEnable{}.Call(Page); err != nil {
+			fmt.Println("Error enabling Accessibility domain:", err)
+		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// set interactive mode for this root command by default
