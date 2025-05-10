@@ -494,13 +494,14 @@ var WinChromeCmd = &cobra.Command{
 		fmt.Println("connecting to WebSocket URL:", wsURL)
 
 		// 5) finally connect
-		browser := rod.New().
+		Browser = rod.New().
 			ControlURL(wsURL).
 			Timeout(5 * time.Second).
 			MustConnect()
 
-		page := browser.MustPage("about:blank")
-		page.MustNavigate("https://traumwind.de")
+		Page = Browser.MustPage("about:blank")
+		Page.MustNavigate("https://traumwind.de")
+		Desktop = true
 	},
 }
 
