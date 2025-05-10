@@ -410,41 +410,55 @@ var WinChromeCmd = &cobra.Command{
 			return
 		}
 
-		// 3) wait & poll the /json/version endpoint
-		var wsURL string
+		// 3) wait & poll /json/version on multiple possible hosts
+		var wsURL, hostUsed string
 		const (
 			maxAttempts = 20
 			pause       = 300 * time.Millisecond
 		)
-		for i := 0; i < maxAttempts; i++ {
-			time.Sleep(pause)
-			u := fmt.Sprintf("http://%s:9222/json/version", hostIP)
-			fmt.Printf("  polling %s (try %d/%d)\n", u, i+1, maxAttempts)
-			resp, err := http.Get(u)
-			if err != nil {
-				continue
+		hosts := []string{hostIP, "127.0.0.1", "localhost"}
+		for _, h := range hosts {
+			for i := 0; i < maxAttempts; i++ {
+				time.Sleep(pause)
+				u := fmt.Sprintf("http://%s:9222/json/version", h)
+				fmt.Printf("  polling %s (try %d/%d)\n", u, i+1, maxAttempts)
+				resp, err := http.Get(u)
+				if err != nil {
+					fmt.Printf("    GET error: %v\n", err)
+					continue
+				}
+				if resp.StatusCode != http.StatusOK {
+					fmt.Printf("    HTTP status: %d\n", resp.StatusCode)
+					resp.Body.Close()
+					continue
+				}
+				body, _ := ioutil.ReadAll(resp.Body)
+				resp.Body.Close()
+				var info map[string]interface{}
+				if err := json.Unmarshal(body, &info); err != nil {
+					fmt.Printf("    JSON error: %v\n", err)
+					continue
+				}
+				if s, ok := info["webSocketDebuggerUrl"].(string); ok {
+					wsURL = s
+					hostUsed = h
+					break
+				}
 			}
-			body, _ := ioutil.ReadAll(resp.Body)
-			resp.Body.Close()
-			var info map[string]interface{}
-			if err := json.Unmarshal(body, &info); err != nil {
-				continue
-			}
-			if s, ok := info["webSocketDebuggerUrl"].(string); ok {
-				wsURL = s
+			if wsURL != "" {
 				break
 			}
+			fmt.Printf("no debugger URL on host %s, trying next\n", h)
 		}
-
 		if wsURL == "" {
 			fmt.Println("Could not get WebSocket URL – is Chrome running with --remote-debugging?")
 			return
 		}
 		fmt.Println("raw wsURL =", wsURL)
 
-		// 4) rewrite 0.0.0.0 → hostIP if necessary
-		if strings.Contains(wsURL, "0.0.0.0") {
-			wsURL = strings.Replace(wsURL, "0.0.0.0", hostIP, 1)
+		// 4) rewrite any 0.0.0.0 in the WS URL to the actual host we used
+		if strings.Contains(wsURL, "0.0.0.0") && hostUsed != "" {
+			wsURL = strings.Replace(wsURL, "0.0.0.0", hostUsed, 1)
 			fmt.Println("rewrote wsURL to", wsURL)
 		}
 
