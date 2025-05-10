@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -494,18 +495,22 @@ var WinChromeCmd = &cobra.Command{
 		// 5) before dialing, show the exact WebSocket URL
 		fmt.Println("connecting to WebSocket URL:", wsURL)
 
-		// 5) finally connect
+		// 5) finally connect: attach to remote, then lift any per-call deadlines
 		Browser = rod.New().
 			ControlURL(wsURL).
-			Timeout(10 * time.Second). // give us a bit more head room
 			MustConnect()
 
-		// Navigate and wait for full load
-		Page = Browser.MustPage("about:blank")
+		// bump the default timeout for all subsequent operations
+		Browser = Browser.Timeout(30 * time.Second)
+
+		// 6) clear per-page deadline, navigate, and wait for full load
+		Page = Browser.
+			MustPage("about:blank").
+			Context(context.Background())
 		Page.MustNavigate("https://traumwind.de")
 		Page.MustWaitLoad().MustWaitIdle()
 
-		// prime the default current element to <body>
+		// 7) prime the current element to <body>
 		CurrentElement = Page.MustElement("body")
 
 		Desktop = true
