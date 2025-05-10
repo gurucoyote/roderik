@@ -99,7 +99,8 @@ var RootCmd = &cobra.Command{
 		}
 		// fmt.Println(Page.MustInfo())
 		// enable Accessibility domain so AX commands (quax/to_markdown) work over remote-debug
-		if _, err := proto.AccessibilityEnable{}.Call(Page); err != nil {
+		_, err := proto.AccessibilityEnable{}.Call(Page)
+		if err != nil {
 			fmt.Println("Error enabling Accessibility domain:", err)
 		}
 	},
