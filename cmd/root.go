@@ -382,12 +382,24 @@ var WinChromeCmd = &cobra.Command{
 			fmt.Println("Could not locate Windows Chrome:", err)
 			return
 		}
+		// 2a) find the real Windows user profile so Chrome can read/write the data dir
+		profCmd := exec.Command("cmd.exe", "/C", "echo", "%USERPROFILE%")
+		profOut, err := profCmd.Output()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "warning: failed to resolve %USERPROFILE%:", err)
+		}
+		winProfile := strings.TrimSpace(string(profOut))
+		if winProfile == "" {
+			fmt.Fprintln(os.Stderr, "warning: %USERPROFILE% expanded to empty, using default data-dir")
+		}
+		userDataDir := winProfile + `\AppData\Local\Google\Chrome\User Data\WSL2`
+		fmt.Println("using Windows user-data-dir =", userDataDir)
 		args0 := []string{
 			"/C", "start", "",
 			winChrome,
 			"--remote-debugging-port=9222",
 			"--remote-debugging-address=0.0.0.0",
-			"--user-data-dir=C:\\Users\\<you>\\AppData\\Local\\Google\\Chrome\\User Data\\WSL2",
+			"--user-data-dir=" + userDataDir,
 			"--no-first-run",
 			"--no-default-browser-check",
 		}
@@ -435,6 +447,9 @@ var WinChromeCmd = &cobra.Command{
 			wsURL = strings.Replace(wsURL, "0.0.0.0", hostIP, 1)
 			fmt.Println("rewrote wsURL to", wsURL)
 		}
+
+		// 5) before dialing, show the exact WebSocket URL
+		fmt.Println("connecting to WebSocket URL:", wsURL)
 
 		// 5) finally connect
 		browser := rod.New().
