@@ -354,64 +354,96 @@ var WinChromeCmd = &cobra.Command{
 	Short: "Launch and attach to Windows Chrome from WSL2",
 	Long:  `Launches Chrome on Windows via WSL2, connects to it, and navigates to https://traumwind.de.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// detect WSL2 (skipped for now)
-		// data, _ := os.ReadFile("/proc/version")
-		// if !bytes.Contains(data, []byte("Microsoft")) {
-		// 	fmt.Println("Not running under WSL2, aborting win-chrome command")
-		// 	return
-		// }
-		// get host IP
-		resolv, _ := os.ReadFile("/etc/resolv.conf")
+		// 1) figure out Windows host IP
+		resolv, err := os.ReadFile("/etc/resolv.conf")
+		if err != nil {
+			fmt.Println("cannot read resolv.conf:", err)
+			return
+		}
 		var hostIP string
 		for _, line := range strings.Split(string(resolv), "\n") {
 			if strings.HasPrefix(line, "nameserver") {
 				parts := strings.Fields(line)
 				if len(parts) >= 2 {
 					hostIP = parts[1]
-					break
 				}
+				break
 			}
 		}
 		if hostIP == "" {
-			fmt.Println("Could not determine host IP")
+			fmt.Println("could not determine host IP")
 			return
 		}
-		// launch Windows Chrome
+		fmt.Println("using host IP =", hostIP)
+
+		// 2) launch Windows Chrome
 		winChrome, err := findChromeOnWindows()
 		if err != nil {
 			fmt.Println("Could not locate Windows Chrome:", err)
 			return
 		}
-		chromeArgs := []string{"/C", "start", "", winChrome, "--remote-debugging-port=9222", "--remote-debugging-address=0.0.0.0", "--user-data-dir=C:\\Users\\<you>\\AppData\\Local\\Google\\Chrome\\User Data\\WSL2", "--no-first-run", "--no-default-browser-check"}
-		cmdExe := exec.Command("cmd.exe", chromeArgs...)
-		if err := cmdExe.Start(); err != nil {
-			fmt.Println("Failed to start Windows Chrome:", err)
+		args0 := []string{
+			"/C", "start", "",
+			winChrome,
+			"--remote-debugging-port=9222",
+			"--remote-debugging-address=0.0.0.0",
+			"--user-data-dir=C:\\Users\\<you>\\AppData\\Local\\Google\\Chrome\\User Data\\WSL2",
+			"--no-first-run",
+			"--no-default-browser-check",
+		}
+		fmt.Println("spawning cmd.exe", args0)
+		cmd0 := exec.Command("cmd.exe", args0...)
+		if err := cmd0.Start(); err != nil {
+			fmt.Println("failed to start Windows Chrome:", err)
 			return
 		}
-		// poll for debugger
+
+		// 3) wait & poll the /json/version endpoint
 		var wsURL string
-		for i := 0; i < 10; i++ {
-			resp, err := http.Get(fmt.Sprintf("http://%s:9222/json/version", hostIP))
-			if err == nil {
-				body, _ := ioutil.ReadAll(resp.Body)
-				resp.Body.Close()
-				var info map[string]interface{}
-				if json.Unmarshal(body, &info) == nil {
-					if url, ok := info["webSocketDebuggerUrl"].(string); ok {
-						wsURL = url
-						break
-					}
-				}
+		const (
+			maxAttempts = 20
+			pause       = 300 * time.Millisecond
+		)
+		for i := 0; i < maxAttempts; i++ {
+			time.Sleep(pause)
+			u := fmt.Sprintf("http://%s:9222/json/version", hostIP)
+			fmt.Printf("  polling %s (try %d/%d)\n", u, i+1, maxAttempts)
+			resp, err := http.Get(u)
+			if err != nil {
+				continue
 			}
-			time.Sleep(500 * time.Millisecond)
+			body, _ := ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			var info map[string]interface{}
+			if err := json.Unmarshal(body, &info); err != nil {
+				continue
+			}
+			if s, ok := info["webSocketDebuggerUrl"].(string); ok {
+				wsURL = s
+				break
+			}
 		}
+
 		if wsURL == "" {
-			fmt.Println("Could not get WebSocket URL")
+			fmt.Println("Could not get WebSocket URL – is Chrome running with --remote-debugging?")
 			return
 		}
-		browser := rod.New().ControlURL(wsURL).MustConnect()
+		fmt.Println("raw wsURL =", wsURL)
+
+		// 4) rewrite 0.0.0.0 → hostIP if necessary
+		if strings.Contains(wsURL, "0.0.0.0") {
+			wsURL = strings.Replace(wsURL, "0.0.0.0", hostIP, 1)
+			fmt.Println("rewrote wsURL to", wsURL)
+		}
+
+		// 5) finally connect
+		browser := rod.New().
+			ControlURL(wsURL).
+			Timeout(5 * time.Second).
+			MustConnect()
+
 		page := browser.MustPage("about:blank")
-		page.Navigate("https://traumwind.de")
+		page.MustNavigate("https://traumwind.de")
 	},
 }
 
