@@ -104,7 +104,7 @@ var SearchCmd = &cobra.Command{
 
 var FindCmd = &cobra.Command{
 	Use:   "find [substring]",
-	Short: "Find elements whose text contains the provided substring",
+	Short: "Find elements whose own direct text nodes contain the provided substring",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		substr := args[0]
@@ -116,13 +116,23 @@ var FindCmd = &cobra.Command{
 			return
 		}
 
-		// filter for those whose visible text includes our substring
+		// JS snippet to grab only this element's direct text nodes
+		const ownTextJS = `
+      () => Array.from(this.childNodes)
+        .filter(n => n.nodeType === 3)
+        .map(n => n.nodeValue.trim())
+        .filter(Boolean)
+        .join(' ')
+    `
+
+		// filter for those whose own text nodes include our substring
 		var matches []*rod.Element
 		for _, el := range all {
-			txt, err := el.Text()
+			val, err := el.Evaluate(ownTextJS)
 			if err != nil {
 				continue
 			}
+			txt := val.Str()
 			if strings.Contains(txt, substr) {
 				matches = append(matches, el)
 			}
@@ -131,16 +141,15 @@ var FindCmd = &cobra.Command{
 		// replace the global list
 		elementList = matches
 
-		switch len(elementList) {
-		case 0:
+		if len(elementList) == 0 {
 			fmt.Println("No elements found.")
 			return
-		default:
-			currentIndex = 0
-			CurrentElement = elementList[0]
-			fmt.Printf("Found %d matching elements. Navigated to the first one.\n", len(elementList))
-			ReportElement(CurrentElement)
 		}
+
+		currentIndex = 0
+		CurrentElement = elementList[0]
+		fmt.Printf("Found %d matching elements. Navigated to the first one.\n", len(elementList))
+		ReportElement(CurrentElement)
 	},
 }
 
