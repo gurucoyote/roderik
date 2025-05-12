@@ -128,11 +128,8 @@ var FindCmd = &cobra.Command{
 		// filter for those whose own text nodes include our substring
 		var matches []*rod.Element
 		for _, el := range all {
-			val, err := el.Evaluate(ownTextJS)
-			if err != nil {
-				continue
-			}
-			txt := val.Str()
+			rv := el.MustEval(ownTextJS)
+			txt := rv.Str()
 			if strings.Contains(txt, substr) {
 				matches = append(matches, el)
 			}
