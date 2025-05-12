@@ -101,6 +101,30 @@ var SearchCmd = &cobra.Command{
 	},
 }
 
+var FindCmd = &cobra.Command{
+	Use:   "find [text]",
+	Short: "Find elements whose text contains the provided substring",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		text := args[0]
+		xpath := fmt.Sprintf("//*[contains(normalize-space(string(.)), %q)]", text)
+		elems, err := Page.ElementsX(xpath)
+		if err != nil {
+			fmt.Println("Error finding elements by text:", err)
+			return
+		}
+		elementList = elems
+		if len(elementList) > 0 {
+			currentIndex = 0
+			CurrentElement = elementList[currentIndex]
+			fmt.Println("Found elements. Navigated to the first element.")
+			ReportElement(CurrentElement)
+		} else {
+			fmt.Println("No elements found.")
+		}
+	},
+}
+
 var FirstCmd = &cobra.Command{
 	Use:   "first",
 	Short: "Navigate to the first element in the list",
@@ -204,6 +228,7 @@ var PsCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(SearchCmd)
+	RootCmd.AddCommand(FindCmd)
 	RootCmd.AddCommand(FirstCmd)
 	RootCmd.AddCommand(LastCmd)
 	RootCmd.AddCommand(NsCmd)
