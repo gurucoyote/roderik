@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/go-rod/rod"
 	"github.com/spf13/cobra"
@@ -102,25 +103,43 @@ var SearchCmd = &cobra.Command{
 }
 
 var FindCmd = &cobra.Command{
-	Use:   "find [text]",
+	Use:   "find [substring]",
 	Short: "Find elements whose text contains the provided substring",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		text := args[0]
-		xpath := fmt.Sprintf("//*[contains(normalize-space(string(.)), %q)]", text)
-		elems, err := Page.ElementsX(xpath)
+		substr := args[0]
+
+		// grab every element on the page
+		all, err := Page.Elements("*")
 		if err != nil {
-			fmt.Println("Error finding elements by text:", err)
+			fmt.Println("Error fetching elements:", err)
 			return
 		}
-		elementList = elems
-		if len(elementList) > 0 {
-			currentIndex = 0
-			CurrentElement = elementList[currentIndex]
-			fmt.Println("Found elements. Navigated to the first element.")
-			ReportElement(CurrentElement)
-		} else {
+
+		// filter for those whose visible text includes our substring
+		var matches []*rod.Element
+		for _, el := range all {
+			txt, err := el.Text()
+			if err != nil {
+				continue
+			}
+			if strings.Contains(txt, substr) {
+				matches = append(matches, el)
+			}
+		}
+
+		// replace the global list
+		elementList = matches
+
+		switch len(elementList) {
+		case 0:
 			fmt.Println("No elements found.")
+			return
+		default:
+			currentIndex = 0
+			CurrentElement = elementList[0]
+			fmt.Printf("Found %d matching elements. Navigated to the first one.\n", len(elementList))
+			ReportElement(CurrentElement)
 		}
 	},
 }
