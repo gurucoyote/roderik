@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"github.com/go-rod/rod"
 
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -253,7 +252,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 				}
 				return nil, fmt.Errorf("run_js execution error: %w", err)
 			}
-			resultJSON, err := value.JSON()
+			resultJSON, err := json.Marshal(value.Value)
 			if err != nil {
 				if showErrors {
 					return mcp.NewToolResultText(fmt.Sprintf("run_js JSON marshal error: %v", err)), nil
