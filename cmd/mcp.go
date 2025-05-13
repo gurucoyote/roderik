@@ -203,6 +203,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	    mcp.NewTool(
 	        "run_js",
 	        mcp.WithDescription(
+	            "Given the following user intent:\n\"Extract all form field names and values from the first form on the page\",\ngenerate a JavaScript IIFE that accomplishes this and returns a JSON-serializable result\nfor a browser automation tool (e.g., go-rod) to consume.\n\n" +
 	            "Inject and execute arbitrary JavaScript on the current page (or optional URL), returning the results as JSON. " +
 	                "Capabilities include interacting with page elements, forms, and retrieving state after actions like navigation or login.",
 	        ),
