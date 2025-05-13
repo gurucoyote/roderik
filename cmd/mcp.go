@@ -198,6 +198,49 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
+	// === Execute arbitrary JS on the page and return JSON results ===
+	s.AddTool(
+	    mcp.NewTool(
+	        "run_js",
+	        mcp.WithDescription(
+	            "Inject and execute arbitrary JavaScript on the current page (or optional URL), returning the results as JSON. " +
+	                "Capabilities include interacting with page elements, forms, and retrieving state after actions like navigation or login.",
+	        ),
+	        mcp.WithString(
+	            "url",
+	            mcp.Description("optional URL to load first; overrides the current element"),
+	        ),
+	        mcp.WithString(
+	            "script",
+	            mcp.Required(), mcp.Description("JavaScript code to execute in the page context"),
+	        ),
+	    ),
+	    func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	        log.Printf("[MCP] TOOL run_js CALLED args=%#v", req.Params.Arguments)
+	        if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
+	            page, err := LoadURL(raw)
+	            if err != nil {
+	                return nil, fmt.Errorf("run_js failed to load url %q: %w", raw, err)
+	            }
+	            CurrentElement = page.MustElement("body")
+	        }
+	        script, _ := req.Params.Arguments["script"].(string)
+	        if CurrentElement == nil {
+	            return nil, fmt.Errorf("run_js error: no element selected—call load_url first or provide url")
+	        }
+	        value, err := Page.Eval(script)
+	        if err != nil {
+	            return nil, fmt.Errorf("run_js execution error: %w", err)
+	        }
+	        resultJSON, err := json.Marshal(value.Value)
+	        if err != nil {
+	            return nil, fmt.Errorf("run_js JSON marshal error: %w", err)
+	        }
+	        log.Printf("[MCP] TOOL run_js RESULT length=%d", len(resultJSON))
+	        return mcp.NewToolResultText(string(resultJSON)), nil
+	    },
+	)
+
 	if err := server.ServeStdio(s); err != nil {
 		log.Printf("MCP server error: %v", err)
 	}
