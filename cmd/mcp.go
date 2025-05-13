@@ -246,14 +246,14 @@ func runMCP(cmd *cobra.Command, args []string) {
 				}
 				return nil, fmt.Errorf("run_js error: no element selected—call load_url first or provide url")
 			}
-			value, err := Page.Eval(script)
+			value, err := CurrentElement.Eval(script)
 			if err != nil {
 				if showErrors {
 					return mcp.NewToolResultText(fmt.Sprintf("run_js execution error: %v", err)), nil
 				}
 				return nil, fmt.Errorf("run_js execution error: %w", err)
 			}
-			resultJSON, err := json.Marshal(value.Value)
+			resultJSON, err := value.JSON()
 			if err != nil {
 				if showErrors {
 					return mcp.NewToolResultText(fmt.Sprintf("run_js JSON marshal error: %v", err)), nil
