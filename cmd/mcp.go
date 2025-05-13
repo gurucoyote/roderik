@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"github.com/go-rod/rod"
 
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
