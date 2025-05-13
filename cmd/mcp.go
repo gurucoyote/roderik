@@ -245,7 +245,9 @@ func runMCP(cmd *cobra.Command, args []string) {
 				}
 				return nil, fmt.Errorf("run_js error: no element selected—call load_url first or provide url")
 			}
-			value, err := CurrentElement.Eval(script)
+			// wrap any JS snippet in an IIFE so Element.Eval sees a function literal
+			wrapped := fmt.Sprintf("() => { return (%s); }", script)
+			value, err := CurrentElement.Eval(wrapped)
 			if err != nil {
 				if showErrors {
 					return mcp.NewToolResultText(fmt.Sprintf("run_js execution error: %v", err)), nil
