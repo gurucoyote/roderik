@@ -215,7 +215,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 				"script",
 				mcp.Required(), mcp.Description("JavaScript code to execute in the page context"),
 			),
-			mcp.WithBool(
+			mcp.WithBoolean(
 				"showErrors",
 				mcp.Description("if true, return any evaluation errors in the tool result text"),
 			),
