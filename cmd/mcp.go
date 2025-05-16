@@ -108,12 +108,19 @@ func runMCP(cmd *cobra.Command, args []string) {
 				if err != nil {
 					return nil, fmt.Errorf("get_html failed to load url %q: %w", raw, err)
 				}
-				CurrentElement = page.MustElement("html")
+				el, err := page.Element("html")
+				if err != nil {
+				    return nil, fmt.Errorf("get_html failed to select <html>: %w", err)
+				}
+				CurrentElement = el
 			}
 			if CurrentElement == nil {
 				return nil, fmt.Errorf("no page loaded – call load_url first or provide url")
 			}
-			html := CurrentElement.MustHTML()
+			html, err := CurrentElement.HTML()
+			if err != nil {
+			    return nil, fmt.Errorf("get_html failed to get HTML: %w", err)
+			}
 			result := mcp.NewToolResultText(html)
 			log.Printf("[MCP] TOOL get_html RESULT length=%d", len(html))
 			return result, nil
