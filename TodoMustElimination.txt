@@ -1,0 +1,28 @@
+1. cmd/css.go
+   - ComputedStyleCmd → CurrentElement.MustEval(...)
+
+2. cmd/a11y.go
+   - quaxCmd when loading URL → Page.MustElement("body")
+   - markdownCmd when loading URL → Page.MustElement("html")
+
+3. cmd/inspect.go
+   - TextCmd → CurrentElement.MustText()
+   - HtmlCmd → Page.MustElement("html")
+   - HtmlCmd → CurrentElement.MustHTML()
+
+4. cmd/mcp.go
+   - load_url tool → CurrentElement = page.MustElement("body")
+   - load_url tool → page.MustInfo().URL
+   - to_markdown tool → CurrentElement = page.MustElement("body")
+
+5. cmd/navigate.go
+   - ChildCmd → CurrentElement.MustElement(":first-child")
+
+6. cmd/root.go
+   - stealth.MustPage(Browser)
+   - Browser.MustPage("about:blank")
+   - Page.MustWaitLoad().MustWaitIdle()
+   - Page.MustInfo().URL
+   - ReportElement → el.MustEval(...)
+   - ReportElement → el.MustElements("*")
+   - ReportElement → el.MustText()
