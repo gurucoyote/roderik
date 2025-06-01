@@ -70,6 +70,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 		mcp.NewTool(
 			"load_url",
 			mcp.WithDescription("Load a webpage at the given URL and set it as the current page for subsequent tools"),
+			mcp.WithHidden(),
 			mcp.WithString("url", mcp.Required(), mcp.Description("the URL of the webpage to load")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
