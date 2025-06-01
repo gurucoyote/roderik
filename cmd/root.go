@@ -245,7 +245,12 @@ func ReportElement(el *rod.Element) {
 		fmt.Println("Error evaluating tag name:", err)
 		return
 	}
-	tagName := tagVal.String()
+	var tagName string
+	if v, ok := tagVal.Value.(string); ok {
+		tagName = v
+	} else {
+		tagName = fmt.Sprint(tagVal.Value)
+	}
 	children, err := el.Elements("*")
 	if err != nil {
 		fmt.Println("Error getting children:", err)
