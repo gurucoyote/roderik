@@ -240,9 +240,23 @@ func prettyPrintJson(s string) string {
 	return string(b)
 }
 func ReportElement(el *rod.Element) {
-	tagName := el.MustEval("() => this.tagName").String()
-	childrenCount := len(el.MustElements("*"))
-	text := el.MustText()
+	tagVal, err := el.Eval("() => this.tagName")
+	if err != nil {
+		fmt.Println("Error evaluating tag name:", err)
+		return
+	}
+	tagName := tagVal.String()
+	children, err := el.Elements("*")
+	if err != nil {
+		fmt.Println("Error getting children:", err)
+		return
+	}
+	childrenCount := len(children)
+	text, err := el.Text()
+	if err != nil {
+		fmt.Println("Error getting text:", err)
+		return
+	}
 
 	// Limit the text to maxChars characters
 	limitedText := fmt.Sprintf("%.50s", text)

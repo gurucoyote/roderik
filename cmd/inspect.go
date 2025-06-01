@@ -26,7 +26,11 @@ var TextCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
-		text := CurrentElement.MustText()
+		text, err := CurrentElement.Text()
+		if err != nil {
+			fmt.Println("Error getting text:", err)
+			return
+		}
 		if len(args) > 0 {
 			length, err := strconv.Atoi(args[0])
 			if err != nil {
@@ -59,7 +63,11 @@ var HtmlCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
-		html := CurrentElement.MustHTML()
+		html, err := CurrentElement.HTML()
+		if err != nil {
+			fmt.Println("Error getting HTML:", err)
+			return
+		}
 		fmt.Println(html)
 	},
 }

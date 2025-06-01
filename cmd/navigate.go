@@ -300,7 +300,11 @@ var ChildCmd = &cobra.Command{
 		if !hasCurrentElement() {
 			return
 		}
-		childElement := CurrentElement.MustElement(":first-child")
+		childElement, err := CurrentElement.Element(":first-child")
+		if err != nil {
+			fmt.Println("Error navigating to the child element:", err)
+			return
+		}
 		CurrentElement = childElement
 		fmt.Println("Navigated to the child element.")
 		ReportElement(CurrentElement)

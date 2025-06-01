@@ -79,7 +79,11 @@ func runMCP(cmd *cobra.Command, args []string) {
 			if err != nil {
 				return nil, fmt.Errorf("load_url failed: %w", err)
 			}
-			CurrentElement = page.MustElement("body")
+			body, err := page.Element("body")
+			if err != nil {
+				return nil, fmt.Errorf("load_url failed to select <body>: %w", err)
+			}
+			CurrentElement = body
 			msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
 			result := mcp.NewToolResultText(msg)
 			log.Printf("[MCP] TOOL load_url RESULT: %q", msg)
@@ -183,7 +187,11 @@ func runMCP(cmd *cobra.Command, args []string) {
 				if err != nil {
 					return nil, fmt.Errorf("to_markdown failed to load url %q: %w", raw, err)
 				}
-				CurrentElement = page.MustElement("body")
+				body, err := page.Element("body")
+				if err != nil {
+					return nil, fmt.Errorf("to_markdown failed to select <body>: %w", err)
+				}
+				CurrentElement = body
 			}
 			if CurrentElement == nil {
 				return nil, fmt.Errorf("no element selected: use load_url and element-selection tools first")
@@ -252,7 +260,14 @@ Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
 					}
 					return nil, fmt.Errorf("run_js load_url error: %w", err)
 				}
-				CurrentElement = page.MustElement("body")
+				body, err := page.Element("body")
+				if err != nil {
+					if showErrors {
+						return mcp.NewToolResultText(fmt.Sprintf("run_js failed to select <body>: %v", err)), nil
+					}
+					return nil, fmt.Errorf("run_js failed to select <body>: %w", err)
+				}
+				CurrentElement = body
 			}
 			script, _ := req.Params.Arguments["script"].(string)
 			if CurrentElement == nil {
