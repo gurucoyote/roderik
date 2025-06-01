@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"io"
 	"log"
 	"os"
@@ -66,11 +67,11 @@ func runMCP(cmd *cobra.Command, args []string) {
 		server.WithToolCapabilities(false),
 	)
 
-	s.AddTool(
-		mcp.NewTool(
-			"load_url",
+	if os.Getenv("RODERIK_ENABLE_LOAD_URL") == "1" || strings.ToLower(os.Getenv("RODERIK_ENABLE_LOAD_URL")) == "true" {
+		s.AddTool(
+			mcp.NewTool(
+				"load_url",
 			mcp.WithDescription("Load a webpage at the given URL and set it as the current page for subsequent tools"),
-			mcp.WithHidden(),
 			mcp.WithString("url", mcp.Required(), mcp.Description("the URL of the webpage to load")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -91,6 +92,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			return result, nil
 		},
 	)
+}
 
 	s.AddTool(
 		mcp.NewTool(
