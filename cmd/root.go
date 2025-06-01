@@ -240,12 +240,7 @@ func prettyPrintJson(s string) string {
 	return string(b)
 }
 func ReportElement(el *rod.Element) {
-	tagVal, err := el.Eval("() => this.tagName")
-	if err != nil {
-		fmt.Println("Error evaluating tag name:", err)
-		return
-	}
-	tagName := tagVal.Str()
+	tagName := el.MustEval("() => this.tagName").String()
 	children, err := el.Elements("*")
 	if err != nil {
 		fmt.Println("Error getting children:", err)
