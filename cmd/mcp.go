@@ -263,6 +263,24 @@ Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
 				showErrors = v
 			}
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
+				// Quickly probe the resource to ensure it is HTML before we open
+				// a full browser page. This prevents hangs/panics on plain-text,
+				// PDF or other non-HTML resources.
+				_, ctype, looksHTML, err := probeURL(raw, 32*1024)
+				if err != nil {
+					if showErrors {
+						return mcp.NewToolResultText(fmt.Sprintf("run_js probe error: %v", err)), nil
+					}
+					return nil, fmt.Errorf("run_js probe error: %w", err)
+				}
+				if !looksHTML {
+					msg := fmt.Sprintf("run_js error: resource at %s is not HTML (Content-Type: %s)", raw, ctype)
+					if showErrors {
+						return mcp.NewToolResultText(msg), nil
+					}
+					return nil, fmt.Errorf(msg)
+				}
+
 				page, err := LoadURL(raw)
 				if err != nil {
 					if showErrors {
