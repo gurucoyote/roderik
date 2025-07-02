@@ -114,14 +114,33 @@ func runMCP(cmd *cobra.Command, args []string) {
 			return withPage(func() (*mcp.CallToolResult, error) {
 				log.Printf("[MCP] TOOL get_html CALLED args=%#v", req.Params.Arguments)
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
-				// loading URL will reset current element to <html>
+				// First probe the resource – if it's not HTML we simply return its raw body.
+				buf, ctype, looksHTML, err := probeURL(raw, 32*1024)
+				if err != nil {
+					return nil, fmt.Errorf("get_html probe error: %w", err)
+				}
+				if !looksHTML {
+					data := buf
+					if len(data) == 0 {
+						resp, err := http.Get(raw)
+						if err != nil {
+							return nil, fmt.Errorf("get_html fetch error: %w", err)
+						}
+						defer resp.Body.Close()
+						data, _ = io.ReadAll(resp.Body)
+					}
+					log.Printf("[MCP] TOOL get_html non-HTML (%s) returning %d bytes", ctype, len(data))
+					return mcp.NewToolResultText(string(data)), nil
+				}
+
+				// HTML → load with browser so we can access <html> element.
 				page, err := LoadURL(raw)
 				if err != nil {
 					return nil, fmt.Errorf("get_html failed to load url %q: %w", raw, err)
 				}
 				el, err := page.Element("html")
 				if err != nil {
-				    return nil, fmt.Errorf("get_html failed to select <html>: %w", err)
+					return nil, fmt.Errorf("get_html failed to select <html>: %w", err)
 				}
 				CurrentElement = el
 			}
