@@ -7,6 +7,7 @@ import (
 	"strings"
 	"io"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/go-rod/rod/lib/proto"
@@ -189,8 +190,28 @@ func runMCP(cmd *cobra.Command, args []string) {
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return withPage(func() (*mcp.CallToolResult, error) {
 				log.Printf("[MCP] TOOL to_markdown CALLED args=%#v", req.Params.Arguments)
-			// if a URL was passed in, load it first (and reset CurrentElement to <body>)
+			// if a URL was passed in, handle it first
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
+				// Fast MIME probe to avoid loading non-HTML resources in the browser
+				buf, ctype, looksHTML, err := probeURL(raw, 32*1024)
+				if err != nil {
+					return nil, fmt.Errorf("to_markdown probe error: %w", err)
+				}
+				if !looksHTML {
+					// Non-HTML → just return raw body/markdown
+					data := buf
+					if len(data) == 0 {
+						resp, err := http.Get(raw)
+						if err != nil {
+							return nil, fmt.Errorf("to_markdown fetch error: %w", err)
+						}
+						defer resp.Body.Close()
+						data, _ = io.ReadAll(resp.Body)
+					}
+					log.Printf("[MCP] TOOL to_markdown non-HTML (%s) returning %d bytes", ctype, len(data))
+					return mcp.NewToolResultText(string(data)), nil
+				}
+
 				page, err := LoadURL(raw)
 				if err != nil {
 					return nil, fmt.Errorf("to_markdown failed to load url %q: %w", raw, err)
