@@ -75,7 +75,8 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithString("url", mcp.Required(), mcp.Description("the URL of the webpage to load")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			log.Printf("[MCP] TOOL load_url CALLED args=%#v", req.Params.Arguments)
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL load_url CALLED args=%#v", req.Params.Arguments)
 			url, _ := req.Params.Arguments["url"].(string)
 			page, err := LoadURL(url)
 			if err != nil {
@@ -90,6 +91,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			result := mcp.NewToolResultText(msg)
 			log.Printf("[MCP] TOOL load_url RESULT: %q", msg)
 			return result, nil
+			})
 		},
 	)
 }
@@ -108,7 +110,8 @@ func runMCP(cmd *cobra.Command, args []string) {
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			log.Printf("[MCP] TOOL get_html CALLED args=%#v", req.Params.Arguments)
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL get_html CALLED args=%#v", req.Params.Arguments)
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
 				// loading URL will reset current element to <html>
 				page, err := LoadURL(raw)
@@ -131,6 +134,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			result := mcp.NewToolResultText(html)
 			log.Printf("[MCP] TOOL get_html RESULT length=%d", len(html))
 			return result, nil
+			})
 		},
 	)
 
@@ -183,7 +187,8 @@ func runMCP(cmd *cobra.Command, args []string) {
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			log.Printf("[MCP] TOOL to_markdown CALLED args=%#v", req.Params.Arguments)
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL to_markdown CALLED args=%#v", req.Params.Arguments)
 			// if a URL was passed in, load it first (and reset CurrentElement to <body>)
 			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
 				page, err := LoadURL(raw)
@@ -213,6 +218,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			md := convertAXTreeToMarkdown(tree, Page)
 			log.Printf("[MCP] TOOL to_markdown RESULT length=%d", len(md))
 			return mcp.NewToolResultText(md), nil
+			})
 		},
 	)
 
@@ -248,7 +254,8 @@ Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			log.Printf("[MCP] TOOL run_js CALLED args=%#v", req.Params.Arguments)
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL run_js CALLED args=%#v", req.Params.Arguments)
 
 			// extract showErrors flag
 			var showErrors bool
@@ -297,6 +304,7 @@ Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
 			}
 			log.Printf("[MCP] TOOL run_js RESULT length=%d", len(resultJSON))
 			return mcp.NewToolResultText(string(resultJSON)), nil
+			})
 		},
 	)
 
