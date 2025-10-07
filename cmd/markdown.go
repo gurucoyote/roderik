@@ -81,8 +81,24 @@ func convertAXTreeToMarkdown(tree *proto.AccessibilityQueryAXTreeResult, page *r
 
 		switch role {
 		case "heading":
+			level := 1
+			for _, prop := range node.Properties {
+				if prop == nil || prop.Name != proto.AccessibilityAXPropertyNameLevel || prop.Value == nil {
+					continue
+				}
+				if lvl := prop.Value.Value.Int(); lvl > 0 {
+					level = lvl
+					break
+				}
+			}
+			if level < 1 {
+				level = 1
+			}
+			if level > 6 {
+				level = 6
+			}
 			// one blank line before, two after
-			sb.WriteString("\n# " + name + "\n\n")
+			sb.WriteString("\n" + strings.Repeat("#", level) + " " + name + "\n\n")
 			continue
 
 		case "paragraph":
