@@ -381,6 +381,10 @@ func runMCP(cmd *cobra.Command, args []string) {
 				if CurrentElement == nil {
 					return nil, fmt.Errorf("no element selected: use load_url and element-selection tools first")
 				}
+				// ensure Accessibility domain is on so heading levels and other AX properties exist
+				if err := (proto.AccessibilityEnable{}).Call(Page); err != nil {
+					return nil, fmt.Errorf("accessibility enable failed: %w", err)
+				}
 				// Describe current element to get backend node ID
 				props, err := CurrentElement.Describe(0, false)
 				if err != nil {
