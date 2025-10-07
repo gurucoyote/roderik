@@ -36,6 +36,16 @@ Recent reliability tweaks:
 - Heading discovery (`head`, initial load) now evaluates the DOM through an inline function, preventing Rod's cached helper from occasionally disappearing and halting navigation.
 - Multiple `roderik` instances can now run side by side by falling back to disposable Chrome user-data profiles when the shared profile is locked, avoiding singleton panics.
 
+## MCP Server Overview
+
+Roderik ships with an MCP server (`go run ./cmd/mcp.go`) that mirrors the CLI commands so agents can drive a shared browser session over stdio. Recent behaviour to keep in mind when wiring a client:
+
+- `load_url` is now enabled by default and should be called before any DOM work. When disabled via `RODERIK_ENABLE_LOAD_URL=0`, the navigation helpers are also withheld so clients don't attempt stale operations.
+- The element discovery tools (`search`, `head`, `elem`) return numbered summaries of the matches and highlight the currently focused index. Follow-up navigation commands can jump directly to the `n`th element by passing `index` to `next`/`prev`.
+- `child`/`parent` reuse the same focus list, so the numbered summaries stay in sync as you traverse the DOM.
+- `html` emits the outer HTML of the focused node; use this after narrowing to the desired index.
+- `run_js` now requires an already-selected element—it no longer accepts a `url` parameter. Clients should `load_url` and navigate before running scripts.
+
 ## Similar
 
 This is a successor to my earlier attempt, called willbrowser, which was written in nodejs and the playwright framework. https://github.com/gurucoyote/willbrowser

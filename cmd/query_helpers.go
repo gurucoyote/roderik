@@ -1,8 +1,8 @@
 package cmd
 
-import (
-	"github.com/go-rod/rod"
-)
+import "github.com/go-rod/rod"
+
+var queryElementsFunc = queryElements
 
 // queryElements wraps Rod's ElementsByJS with an inline arrow function so we
 // avoid relying on the cached helper that occasionally goes missing, which

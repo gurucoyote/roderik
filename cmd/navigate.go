@@ -63,7 +63,7 @@ var HeadCmd = &cobra.Command{
 		if len(args) > 0 {
 			selector = fmt.Sprintf("h%s", args[0])
 		}
-		headings, err := queryElements(Page, selector)
+		headings, err := queryElementsFunc(Page, selector)
 		if err != nil {
 			fmt.Println("Error finding headings:", err)
 			return
@@ -88,7 +88,7 @@ var SearchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		selector := args[0]
-		elements, err := queryElements(Page, selector)
+		elements, err := queryElementsFunc(Page, selector)
 		if err != nil {
 			fmt.Println("Error searching for elements:", err)
 			return
@@ -113,7 +113,7 @@ var FindCmd = &cobra.Command{
 		substr := args[0]
 
 		// grab every element on the page
-		all, err := queryElements(Page, "*")
+		all, err := queryElementsFunc(Page, "*")
 		if err != nil {
 			fmt.Println("Error fetching elements:", err)
 			return

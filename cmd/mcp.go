@@ -51,6 +51,26 @@ type ToolSpec struct {
 	ArgsSchema  json.RawMessage `json:"args_schema"`
 }
 
+func loadURLToolEnabled() bool {
+	val := strings.TrimSpace(os.Getenv("RODERIK_ENABLE_LOAD_URL"))
+	if val == "" {
+		return true
+	}
+	val = strings.ToLower(val)
+	switch val {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return true
+	}
+}
+
+func navigationToolsEnabled() bool {
+	return loadURLToolEnabled()
+}
+
 func runMCP(cmd *cobra.Command, args []string) {
 	log.SetOutput(os.Stderr)
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
@@ -70,7 +90,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 		server.WithToolCapabilities(false),
 	)
 
-	if os.Getenv("RODERIK_ENABLE_LOAD_URL") == "1" || strings.ToLower(os.Getenv("RODERIK_ENABLE_LOAD_URL")) == "true" {
+	if loadURLToolEnabled() {
 		s.AddTool(
 			mcp.NewTool(
 				"load_url",
@@ -283,12 +303,161 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
+	if navigationToolsEnabled() {
+		// === DOM navigation helpers ===
+		s.AddTool(
+			mcp.NewTool(
+				"search",
+				mcp.WithDescription("Search for elements matching a CSS selector, focus the first match, and return a numbered list for subsequent navigation commands."),
+				mcp.WithString("selector", mcp.Required(), mcp.Description("CSS selector to query")),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					selector, _ := req.Params.Arguments["selector"].(string)
+					msg, err := mcpSearch(selector)
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"head",
+				mcp.WithDescription("List page headings (optionally by level), focus the first match, and return a numbered index."),
+				mcp.WithString("level", mcp.Description("Heading level number (1-6)")),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					level, _ := req.Params.Arguments["level"].(string)
+					msg, err := mcpHead(level)
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"next",
+				mcp.WithDescription("Advance to the next element in the active search/head list or jump to a specific index."),
+				mcp.WithNumber("index", mcp.Description("optional index to jump to")),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					var idxPtr *int
+					if v, ok := req.Params.Arguments["index"].(float64); ok {
+						i := int(v)
+						idxPtr = &i
+					}
+					msg, err := mcpNext(idxPtr)
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"prev",
+				mcp.WithDescription("Move to the previous element in the active search/head list or jump to a specific index."),
+				mcp.WithNumber("index", mcp.Description("optional index to jump to")),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					var idxPtr *int
+					if v, ok := req.Params.Arguments["index"].(float64); ok {
+						i := int(v)
+						idxPtr = &i
+					}
+					msg, err := mcpPrev(idxPtr)
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"elem",
+				mcp.WithDescription("Match elements by selector (scoped to the current element, falling back to the page), focus the best match, and return a numbered list."),
+				mcp.WithString("selector", mcp.Required(), mcp.Description("CSS selector to resolve")),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					selector, _ := req.Params.Arguments["selector"].(string)
+					msg, err := mcpElem(selector)
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"child",
+				mcp.WithDescription("Focus the first child element of the current selection."),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					msg, err := mcpChild()
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"parent",
+				mcp.WithDescription("Focus the parent element of the current selection."),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					msg, err := mcpParent()
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"html",
+				mcp.WithDescription("Return the outer HTML of the current element that prior navigation selected."),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					html, err := mcpHTML()
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(html), nil
+				})
+			},
+		)
+	}
+
 	// === Execute arbitrary JS on the page and return JSON results ===
 	s.AddTool(
 		mcp.NewTool(
 			"run_js",
 			mcp.WithDescription(
-				`Execute JavaScript on the current page (or an optional URL) and return the result as JSON.
+				`Execute JavaScript on the current page and return the result as JSON.
 Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
 
   (() => {
@@ -300,10 +469,6 @@ Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
     return links;
   })()
 `,
-			),
-			mcp.WithString(
-				"url",
-				mcp.Description("optional URL to load first; overrides the current element"),
 			),
 			mcp.WithString(
 				"script",
@@ -323,48 +488,14 @@ Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
 				if v, ok := req.Params.Arguments["showErrors"].(bool); ok {
 					showErrors = v
 				}
-				if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
-					// Quickly probe the resource to ensure it is HTML before we open
-					// a full browser page. This prevents hangs/panics on plain-text,
-					// PDF or other non-HTML resources.
-					_, ctype, looksHTML, err := probeURL(raw, 32*1024)
-					if err != nil {
-						if showErrors {
-							return mcp.NewToolResultText(fmt.Sprintf("run_js probe error: %v", err)), nil
-						}
-						return nil, fmt.Errorf("run_js probe error: %w", err)
+				if CurrentElement == nil {
+					msg := "run_js error: no element selected—call load_url and navigation tools first"
+					if showErrors {
+						return mcp.NewToolResultText(msg), nil
 					}
-					if !looksHTML {
-						msg := fmt.Sprintf("run_js error: resource at %s is not HTML (Content-Type: %s)", raw, ctype)
-						if showErrors {
-							return mcp.NewToolResultText(msg), nil
-						}
-						return nil, fmt.Errorf(msg)
-					}
-
-					page, err := LoadURL(raw)
-					if err != nil {
-						if showErrors {
-							return mcp.NewToolResultText(fmt.Sprintf("run_js load_url error: %v", err)), nil
-						}
-						return nil, fmt.Errorf("run_js load_url error: %w", err)
-					}
-					body, err := page.Element("body")
-					if err != nil {
-						if showErrors {
-							return mcp.NewToolResultText(fmt.Sprintf("run_js failed to select <body>: %v", err)), nil
-						}
-						return nil, fmt.Errorf("run_js failed to select <body>: %w", err)
-					}
-					CurrentElement = body
+					return nil, fmt.Errorf(msg)
 				}
 				script, _ := req.Params.Arguments["script"].(string)
-				if CurrentElement == nil {
-					if showErrors {
-						return mcp.NewToolResultText("run_js error: no element selected—call load_url first or provide url"), nil
-					}
-					return nil, fmt.Errorf("run_js error: no element selected—call load_url first or provide url")
-				}
 				// wrap any JS snippet in an IIFE so Element.Eval sees a function literal
 				wrapped := fmt.Sprintf("() => { return (%s); }", script)
 				value, err := CurrentElement.Eval(wrapped)

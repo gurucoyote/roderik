@@ -65,6 +65,30 @@ func (l *EventLog) Display() {
 	}
 }
 
+var (
+	pageEventMu   sync.Mutex
+	pageEventPage *rod.Page
+)
+
+var (
+	eventLogMu     sync.RWMutex
+	activeEventLog *EventLog
+)
+
+func setActiveEventLog(log *EventLog) {
+	eventLogMu.Lock()
+	activeEventLog = log
+	eventLogMu.Unlock()
+}
+
+func appendEventLog(msg string) {
+	eventLogMu.RLock()
+	defer eventLogMu.RUnlock()
+	if activeEventLog != nil {
+		activeEventLog.Add(msg)
+	}
+}
+
 var Browser *rod.Browser
 var Page *rod.Page
 var CurrentElement *rod.Element
@@ -73,6 +97,65 @@ var tempUserDataDir string
 var browserInitErr error
 var desktopWSURL string
 var desktopHostUsed string
+
+var registerPageEvents = func(p *rod.Page) {
+	p.EnableDomain(proto.NetworkEnable{})
+	go p.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
+		msg := fmt.Sprintf("Request sent: %s", e.Request.URL)
+		if ShowNetActivity {
+			fmt.Fprintln(os.Stderr, msg)
+		}
+		appendEventLog(msg)
+	})()
+	go p.EachEvent(func(e *proto.NetworkResponseReceived) {
+		msg := fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status)
+		if ShowNetActivity {
+			fmt.Fprintln(os.Stderr, msg)
+		}
+		appendEventLog(msg)
+	})()
+	go p.EachEvent(func(e *proto.PageFrameNavigated) {
+		fmt.Fprintln(os.Stderr, "Navigated to:", e.Frame.URL)
+		if el, err := p.Timeout(5 * time.Second).Element("body"); err == nil {
+			CurrentElement = el
+			elementList = nil
+			currentIndex = 0
+		} else if Verbose {
+			fmt.Fprintf(os.Stderr, "warning: failed to reset body after navigation: %v\n", err)
+		}
+	})()
+	go p.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
+		fmt.Println("Dialog type: ", e.Type, "Dialog message: ", e.Message)
+		switch e.Type {
+		case "prompt":
+			userInput := GetUserInput(e.Message + " ")
+			_ = proto.PageHandleJavaScriptDialog{Accept: true, PromptText: userInput}.Call(p)
+		case "confirm":
+			confirmation := AskForConfirmation(e.Message + " (y/n) ")
+			_ = proto.PageHandleJavaScriptDialog{Accept: confirmation, PromptText: ""}.Call(p)
+		case "alert":
+			fmt.Println(e.Message)
+			_ = proto.PageHandleJavaScriptDialog{Accept: true, PromptText: ""}.Call(p)
+		}
+	})()
+	go p.EachEvent(func(e *proto.RuntimeConsoleAPICalled) {
+		fmt.Fprintln(os.Stderr, "console:", p.MustObjectsToJSON(e.Args))
+	})()
+}
+
+func ensurePageEventHandlers(p *rod.Page) {
+	if p == nil {
+		return
+	}
+	pageEventMu.Lock()
+	defer pageEventMu.Unlock()
+	if pageEventPage == p {
+		return
+	}
+
+	registerPageEvents(p)
+	pageEventPage = p
+}
 
 var RootCmd = &cobra.Command{
 	Use:   "roderik",
@@ -141,7 +224,7 @@ var RootCmd = &cobra.Command{
 			return
 		}
 
-		headings, err := queryElements(Page, "h1, h2, h3, h4, h5, h6")
+		headings, err := queryElementsFunc(Page, "h1, h2, h3, h4, h5, h6")
 		if err != nil {
 			if Verbose {
 				fmt.Println("Error finding headings:", err)
@@ -238,55 +321,8 @@ func isValidURL(str string) bool {
 func LoadURL(targetURL string) (*rod.Page, error) {
 	// setup network aktivity logging
 	eventLog := &EventLog{}
-
-	Page.EnableDomain(proto.NetworkEnable{})
-	go Page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
-		msg := fmt.Sprintf("Request sent: %s", e.Request.URL)
-		if ShowNetActivity {
-			fmt.Fprintln(os.Stderr, msg)
-		}
-		eventLog.Add(msg)
-	})()
-	go Page.EachEvent(func(e *proto.NetworkResponseReceived) {
-		msg := fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status)
-		if ShowNetActivity {
-			fmt.Fprintln(os.Stderr, msg)
-		}
-		eventLog.Add(msg)
-	})()
-	// setup event listener for navigate events
-	go Page.EachEvent(func(e *proto.PageFrameNavigated) {
-		fmt.Fprintln(os.Stderr, "Navigated to:", e.Frame.URL)
-		if el, err := Page.Timeout(5 * time.Second).Element("body"); err == nil {
-			CurrentElement = el
-			elementList = nil
-			currentIndex = 0
-		} else if Verbose {
-			fmt.Fprintf(os.Stderr, "warning: failed to reset body after navigation: %v\n", err)
-		}
-	})()
-	// setup event listener for dialogs
-	go Page.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
-		fmt.Println("Dialog type: ", e.Type, "Dialog message: ", e.Message)
-		switch e.Type {
-		case "prompt":
-			userInput := GetUserInput(e.Message + " ")
-			_ = proto.PageHandleJavaScriptDialog{Accept: true, PromptText: userInput}.Call(Page)
-		case "confirm":
-			confirmation := AskForConfirmation(e.Message + " (y/n) ")
-			_ = proto.PageHandleJavaScriptDialog{Accept: confirmation, PromptText: ""}.Call(Page)
-		case "alert":
-			fmt.Println(e.Message)
-			_ = proto.PageHandleJavaScriptDialog{Accept: true, PromptText: ""}.Call(Page)
-		}
-	})()
-
-	// Listen for all events of console output.
-	if true {
-		go Page.EachEvent(func(e *proto.RuntimeConsoleAPICalled) {
-			fmt.Fprintln(os.Stderr, "console:", Page.MustObjectsToJSON(e.Args))
-		})()
-	}
+	setActiveEventLog(eventLog)
+	ensurePageEventHandlers(Page)
 
 	if err := Page.Navigate(targetURL); err != nil {
 		return nil, err
