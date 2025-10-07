@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
@@ -60,7 +61,8 @@ var TypeCmd = &cobra.Command{
 				text = text[1 : l-1]
 			}
 		}
-		if err := CurrentElement.Input(text); err != nil {
+		if err := CurrentElement.Timeout(2 * time.Second).Input(text); err != nil {
+			setValueViaJS(CurrentElement, text)
 			if !setValueViaJS(CurrentElement, text) {
 				fmt.Println("Error typing into the current element:", err)
 			}
@@ -81,11 +83,11 @@ func navigateViaHrefFallback(clickErr error) bool {
 	}
 	hrefAttr, err := CurrentElement.Attribute("href")
 	if err != nil || hrefAttr == nil {
-		return false
+		return triggerSyntheticClick(clickErr)
 	}
 	href := strings.TrimSpace(*hrefAttr)
 	if href == "" {
-		return false
+		return triggerSyntheticClick(clickErr)
 	}
 
 	base := ""
@@ -98,7 +100,7 @@ func navigateViaHrefFallback(clickErr error) bool {
 	}
 	resolved, err := resolveURL(base, href)
 	if err != nil || resolved == "" {
-		return false
+		return triggerSyntheticClick(clickErr)
 	}
 
 	page, loadErr := LoadURL(resolved)
@@ -110,6 +112,25 @@ func navigateViaHrefFallback(clickErr error) bool {
 	Page = page
 	if Verbose {
 		fmt.Fprintf(os.Stderr, "fallback navigated via href to %s\n", resolved)
+	}
+	return true
+}
+
+func triggerSyntheticClick(clickErr error) bool {
+	if CurrentElement == nil {
+		return false
+	}
+	if _, err := CurrentElement.Eval(`() => {
+	  const el = this;
+	  if (typeof el.click === 'function') {
+	    el.click();
+	  } else {
+	    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+	  }
+	}`); err != nil {
+		fmt.Println("Error clicking on the current element:", clickErr)
+		fmt.Println("Synthetic click failed:", err)
+		return true
 	}
 	return true
 }

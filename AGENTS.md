@@ -40,6 +40,7 @@
 - Navigation hooks reset the active element after each page load; commands like `search`, `elem`, and `click` now track the desktop browser when you navigate in the GUI. If a real click times out, the shell falls back to the element’s `href` so link traversal continues.
 - `type` accepts multiple words and strips optional wrapping quotes before sending keys, matching common CLI usage (e.g., `type "roderik browser"`).
 - When native typing stalls (common in desktop attach mode), the CLI falls back to injecting the value via JavaScript and dispatching `input`/`change` events, keeping form fields in sync.
+- When native clicks or typing time out, the CLI retries in page JavaScript: anchors trigger `href` navigation; other controls synthesize `click`/`input` events so desktop sessions stay responsive.
 - Avoid calling DevTools tools that assume “network idle” (e.g., `Page.MustWaitIdle`) against long-lived pages; they now wait only for the initial load event to prevent `context deadline exceeded` errors.
 
 ## Windows Builds
