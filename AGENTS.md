@@ -39,6 +39,7 @@
 - The launcher starts Windows Chrome via `cmd.exe` with `--remote-debugging-port=9222` and a dedicated `WSL2` profile. Confirm the port is reachable from WSL by either allowing it through the Windows firewall (`New-NetFirewallRule -Direction Inbound -Protocol TCP -LocalPort 9222 -RemoteAddress <WSL_IP>`) or forwarding it with `netsh interface portproxy`/SSH when Chrome binds to `127.0.0.1`.
 - Navigation hooks reset the active element after each page load; commands like `search`, `elem`, and `click` now track the desktop browser when you navigate in the GUI. If a real click times out, the shell falls back to the element’s `href` so link traversal continues.
 - `type` accepts multiple words and strips optional wrapping quotes before sending keys, matching common CLI usage (e.g., `type "roderik browser"`).
+- When native typing stalls (common in desktop attach mode), the CLI falls back to injecting the value via JavaScript and dispatching `input`/`change` events, keeping form fields in sync.
 - Avoid calling DevTools tools that assume “network idle” (e.g., `Page.MustWaitIdle`) against long-lived pages; they now wait only for the initial load event to prevent `context deadline exceeded` errors.
 
 ## Windows Builds

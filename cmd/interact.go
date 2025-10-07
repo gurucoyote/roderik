@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/spf13/cobra"
 )
@@ -59,9 +60,10 @@ var TypeCmd = &cobra.Command{
 				text = text[1 : l-1]
 			}
 		}
-		err := CurrentElement.Input(text)
-		if err != nil {
-			fmt.Println("Error typing into the current element:", err)
+		if err := CurrentElement.Input(text); err != nil {
+			if !setValueViaJS(CurrentElement, text) {
+				fmt.Println("Error typing into the current element:", err)
+			}
 			return
 		}
 	},
@@ -128,4 +130,33 @@ func resolveURL(base, href string) (string, error) {
 		return "", err
 	}
 	return baseURL.ResolveReference(u).String(), nil
+}
+
+func setValueViaJS(el *rod.Element, value string) bool {
+	if el == nil {
+		return false
+	}
+	_, err := el.Eval(`value => {
+	  const el = this;
+	  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+	    el.focus();
+	    const prototype = Object.getPrototypeOf(el);
+	    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+	    if (descriptor && descriptor.set) {
+	      descriptor.set.call(el, value);
+	    } else {
+	      el.value = value;
+	    }
+	    ['input','change'].forEach(type => {
+	      el.dispatchEvent(new Event(type, { bubbles: true }));
+	    });
+	  } else {
+	    el.textContent = value;
+	  }
+	}`, value)
+	if err != nil {
+		fmt.Println("Fallback typing failed:", err)
+		return false
+	}
+	return true
 }
