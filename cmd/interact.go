@@ -52,7 +52,13 @@ var TypeCmd = &cobra.Command{
 			fmt.Println("Error: No text provided for typing")
 			return
 		}
-		text := args[0]
+		text := strings.Join(args, " ")
+		text = strings.TrimSpace(text)
+		if l := len(text); l >= 2 {
+			if (text[0] == '"' && text[l-1] == '"') || (text[0] == '\'' && text[l-1] == '\'') {
+				text = text[1 : l-1]
+			}
+		}
 		err := CurrentElement.Input(text)
 		if err != nil {
 			fmt.Println("Error typing into the current element:", err)
