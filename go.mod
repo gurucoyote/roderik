@@ -11,7 +11,6 @@ require (
 	github.com/go-rod/stealth v0.4.9
 	github.com/mark3labs/mcp-go v0.24.1
 	github.com/spf13/cobra v1.8.1
-	github.com/ysmood/gson v0.7.3
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 	golang.org/x/text v0.3.0
 )
@@ -28,6 +27,7 @@ require (
 	github.com/ysmood/fetchup v0.2.4 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect
+	github.com/ysmood/gson v0.7.3 // indirect
 	github.com/ysmood/leakless v0.9.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 )

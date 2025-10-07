@@ -69,6 +69,8 @@ var Browser *rod.Browser
 var Page *rod.Page
 var CurrentElement *rod.Element
 var Desktop bool // Indicates we have attached to a desktop Chrome instance
+var tempUserDataDir string
+var browserInitErr error
 
 var RootCmd = &cobra.Command{
 	Use:   "roderik",
@@ -85,9 +87,12 @@ var RootCmd = &cobra.Command{
 			// Prepare the browser
 			tmp, err := PrepareBrowser()
 			if err != nil {
-				fmt.Println("Error preparing browser:", err)
+				browserInitErr = err
+				Page = nil
+				Browser = nil
 				return
 			}
+			browserInitErr = nil
 			Browser = tmp
 			if Stealth {
 				Page = stealth.MustPage(Browser)
@@ -98,6 +103,14 @@ var RootCmd = &cobra.Command{
 		// fmt.Println(Page.MustInfo())
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		if browserInitErr != nil {
+			fmt.Println("Error preparing browser:", browserInitErr)
+			return
+		}
+		if Page == nil {
+			fmt.Println("Error preparing browser: browser not initialized")
+			return
+		}
 		// set interactive mode for this root command by default
 		Interactive = true
 
@@ -131,7 +144,12 @@ var RootCmd = &cobra.Command{
 		}
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-		// This function will always be run after any command (including sub-commands) is executed
+		if tempUserDataDir != "" {
+			if err := os.RemoveAll(tempUserDataDir); err != nil && Verbose {
+				fmt.Fprintf(os.Stderr, "warning: failed to remove temporary user data dir %s: %v\n", tempUserDataDir, err)
+			}
+			tempUserDataDir = ""
+		}
 	},
 }
 
@@ -150,20 +168,47 @@ func PrepareBrowser() (*rod.Browser, error) {
 	if !found {
 		return nil, fmt.Errorf("browser executable path not found")
 	}
-	u := launcher.New().Bin(path).
-		Set("disable-web-security").
-		Set("disable-setuid-sandbox").
-		Set("no-sandbox").
-		Set("no-first-run", "true").
-		Set("disable-gpu").
-		Set("user-data-dir", userDataDir)
-	if IgnoreCertErrors {
-		u.Set("ignore-certificate-errors") // Set the flag to ignore certificate errors if specified
+
+	launchWithProfile := func(profileDir string) (string, error) {
+		l := launcher.New().Bin(path).
+			Set("disable-web-security").
+			Set("disable-setuid-sandbox").
+			Set("no-sandbox").
+			Set("no-first-run", "true").
+			Set("disable-gpu").
+			Set("user-data-dir", profileDir)
+		if IgnoreCertErrors {
+			l.Set("ignore-certificate-errors")
+		}
+		return l.Headless(true).Launch()
 	}
-	controlURL := u.Headless(true).MustLaunch()
+
+	controlURL, err := launchWithProfile(userDataDir)
+	if err != nil && isProfileLockError(err) {
+		tempDir, mkErr := os.MkdirTemp(userDataDir, "profile-")
+		if mkErr != nil {
+			return nil, fmt.Errorf("failed to create temporary user data dir: %w", mkErr)
+		}
+		tempUserDataDir = tempDir
+		if Verbose {
+			fmt.Fprintf(os.Stderr, "falling back to temporary user data dir %s due to profile lock\n", tempUserDataDir)
+		}
+		controlURL, err = launchWithProfile(tempUserDataDir)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to launch browser: %w", err)
+	}
 	browser := rod.New().ControlURL(controlURL).MustConnect()
 
 	return browser, nil
+}
+
+func isProfileLockError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "ProcessSingleton") || strings.Contains(errStr, "SingletonLock")
 }
 
 func isValidURL(str string) bool {

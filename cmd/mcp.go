@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -163,10 +165,19 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
+	var shutdownOnce sync.Once
+
 	s.AddTool(
 		mcp.NewTool("shutdown", mcp.WithDescription("Shut down the MCP server")),
 		func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return mcp.NewToolResultText("shutting down"), context.Canceled
+			shutdownOnce.Do(func() {
+				go func() {
+					time.Sleep(200 * time.Millisecond) // allow stdio response to flush
+					log.Printf("[MCP] shutdown requested – exiting")
+					os.Exit(0)
+				}()
+			})
+			return mcp.NewToolResultText("shutting down"), nil
 		},
 	)
 

@@ -34,6 +34,7 @@ It very much needs refining and better error handling etc.
 
 Recent reliability tweaks:
 - Heading discovery (`head`, initial load) now evaluates the DOM through an inline function, preventing Rod's cached helper from occasionally disappearing and halting navigation.
+- Multiple `roderik` instances can now run side by side by falling back to disposable Chrome user-data profiles when the shared profile is locked, avoiding singleton panics.
 
 ## Similar
 
