@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -72,30 +72,30 @@ func runMCP(cmd *cobra.Command, args []string) {
 		s.AddTool(
 			mcp.NewTool(
 				"load_url",
-			mcp.WithDescription("Load a webpage at the given URL and set it as the current page for subsequent tools"),
-			mcp.WithString("url", mcp.Required(), mcp.Description("the URL of the webpage to load")),
-		),
-		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL load_url CALLED args=%#v", req.Params.Arguments)
-			url, _ := req.Params.Arguments["url"].(string)
-			page, err := LoadURL(url)
-			if err != nil {
-				return nil, fmt.Errorf("load_url failed: %w", err)
-			}
-			body, err := page.Element("body")
-			if err != nil {
-				return nil, fmt.Errorf("load_url failed to select <body>: %w", err)
-			}
-			CurrentElement = body
-			msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
-			result := mcp.NewToolResultText(msg)
-			log.Printf("[MCP] TOOL load_url RESULT: %q", msg)
-			return result, nil
-			})
-		},
-	)
-}
+				mcp.WithDescription("Load a webpage at the given URL and set it as the current page for subsequent tools"),
+				mcp.WithString("url", mcp.Required(), mcp.Description("the URL of the webpage to load")),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					log.Printf("[MCP] TOOL load_url CALLED args=%#v", req.Params.Arguments)
+					url, _ := req.Params.Arguments["url"].(string)
+					page, err := LoadURL(url)
+					if err != nil {
+						return nil, fmt.Errorf("load_url failed: %w", err)
+					}
+					body, err := page.Element("body")
+					if err != nil {
+						return nil, fmt.Errorf("load_url failed to select <body>: %w", err)
+					}
+					CurrentElement = body
+					msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
+					result := mcp.NewToolResultText(msg)
+					log.Printf("[MCP] TOOL load_url RESULT: %q", msg)
+					return result, nil
+				})
+			},
+		)
+	}
 
 	s.AddTool(
 		mcp.NewTool(
@@ -113,47 +113,52 @@ func runMCP(cmd *cobra.Command, args []string) {
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return withPage(func() (*mcp.CallToolResult, error) {
 				log.Printf("[MCP] TOOL get_html CALLED args=%#v", req.Params.Arguments)
-			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
-				// First probe the resource – if it's not HTML we simply return its raw body.
-				buf, ctype, looksHTML, err := probeURL(raw, 32*1024)
-				if err != nil {
-					return nil, fmt.Errorf("get_html probe error: %w", err)
-				}
-				if !looksHTML {
-					data := buf
-					if len(data) == 0 {
-						resp, err := http.Get(raw)
-						if err != nil {
-							return nil, fmt.Errorf("get_html fetch error: %w", err)
-						}
-						defer resp.Body.Close()
-						data, _ = io.ReadAll(resp.Body)
+				if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
+					// First probe the resource – if it's not HTML we simply return its raw body.
+					buf, ctype, looksHTML, err := probeURL(raw, 32*1024)
+					if err != nil {
+						return nil, fmt.Errorf("get_html probe error: %w", err)
 					}
-					log.Printf("[MCP] TOOL get_html non-HTML (%s) returning %d bytes", ctype, len(data))
-					return mcp.NewToolResultText(string(data)), nil
-				}
+					if !looksHTML {
+						data := buf
+						if len(data) == 0 {
+							resp, err := http.Get(raw)
+							if err != nil {
+								return nil, fmt.Errorf("get_html fetch error: %w", err)
+							}
+							defer resp.Body.Close()
+							data, _ = io.ReadAll(resp.Body)
+							ctype = resp.Header.Get("Content-Type")
+						}
+						text, err := decodeToUTF8(data, ctype)
+						if err != nil {
+							return nil, fmt.Errorf("get_html decode error: %w", err)
+						}
+						log.Printf("[MCP] TOOL get_html non-HTML (%s) returning %d bytes", ctype, len(text))
+						return mcp.NewToolResultText(text), nil
+					}
 
-				// HTML → load with browser so we can access <html> element.
-				page, err := LoadURL(raw)
-				if err != nil {
-					return nil, fmt.Errorf("get_html failed to load url %q: %w", raw, err)
+					// HTML → load with browser so we can access <html> element.
+					page, err := LoadURL(raw)
+					if err != nil {
+						return nil, fmt.Errorf("get_html failed to load url %q: %w", raw, err)
+					}
+					el, err := page.Element("html")
+					if err != nil {
+						return nil, fmt.Errorf("get_html failed to select <html>: %w", err)
+					}
+					CurrentElement = el
 				}
-				el, err := page.Element("html")
-				if err != nil {
-					return nil, fmt.Errorf("get_html failed to select <html>: %w", err)
+				if CurrentElement == nil {
+					return nil, fmt.Errorf("no page loaded – call load_url first or provide url")
 				}
-				CurrentElement = el
-			}
-			if CurrentElement == nil {
-				return nil, fmt.Errorf("no page loaded – call load_url first or provide url")
-			}
-			html, err := CurrentElement.HTML()
-			if err != nil {
-			    return nil, fmt.Errorf("get_html failed to get HTML: %w", err)
-			}
-			result := mcp.NewToolResultText(html)
-			log.Printf("[MCP] TOOL get_html RESULT length=%d", len(html))
-			return result, nil
+				html, err := CurrentElement.HTML()
+				if err != nil {
+					return nil, fmt.Errorf("get_html failed to get HTML: %w", err)
+				}
+				result := mcp.NewToolResultText(html)
+				log.Printf("[MCP] TOOL get_html RESULT length=%d", len(html))
+				return result, nil
 			})
 		},
 	)
@@ -209,55 +214,60 @@ func runMCP(cmd *cobra.Command, args []string) {
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return withPage(func() (*mcp.CallToolResult, error) {
 				log.Printf("[MCP] TOOL to_markdown CALLED args=%#v", req.Params.Arguments)
-			// if a URL was passed in, handle it first
-			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
-				// Fast MIME probe to avoid loading non-HTML resources in the browser
-				buf, ctype, looksHTML, err := probeURL(raw, 32*1024)
-				if err != nil {
-					return nil, fmt.Errorf("to_markdown probe error: %w", err)
-				}
-				if !looksHTML {
-					// Non-HTML → just return raw body/markdown
-					data := buf
-					if len(data) == 0 {
-						resp, err := http.Get(raw)
-						if err != nil {
-							return nil, fmt.Errorf("to_markdown fetch error: %w", err)
-						}
-						defer resp.Body.Close()
-						data, _ = io.ReadAll(resp.Body)
+				// if a URL was passed in, handle it first
+				if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
+					// Fast MIME probe to avoid loading non-HTML resources in the browser
+					buf, ctype, looksHTML, err := probeURL(raw, 32*1024)
+					if err != nil {
+						return nil, fmt.Errorf("to_markdown probe error: %w", err)
 					}
-					log.Printf("[MCP] TOOL to_markdown non-HTML (%s) returning %d bytes", ctype, len(data))
-					return mcp.NewToolResultText(string(data)), nil
-				}
+					if !looksHTML {
+						// Non-HTML → just return raw body/markdown
+						data := buf
+						if len(data) == 0 {
+							resp, err := http.Get(raw)
+							if err != nil {
+								return nil, fmt.Errorf("to_markdown fetch error: %w", err)
+							}
+							defer resp.Body.Close()
+							data, _ = io.ReadAll(resp.Body)
+							ctype = resp.Header.Get("Content-Type")
+						}
+						text, err := decodeToUTF8(data, ctype)
+						if err != nil {
+							return nil, fmt.Errorf("to_markdown decode error: %w", err)
+						}
+						log.Printf("[MCP] TOOL to_markdown non-HTML (%s) returning %d bytes", ctype, len(text))
+						return mcp.NewToolResultText(text), nil
+					}
 
-				page, err := LoadURL(raw)
-				if err != nil {
-					return nil, fmt.Errorf("to_markdown failed to load url %q: %w", raw, err)
+					page, err := LoadURL(raw)
+					if err != nil {
+						return nil, fmt.Errorf("to_markdown failed to load url %q: %w", raw, err)
+					}
+					body, err := page.Element("body")
+					if err != nil {
+						return nil, fmt.Errorf("to_markdown failed to select <body>: %w", err)
+					}
+					CurrentElement = body
 				}
-				body, err := page.Element("body")
-				if err != nil {
-					return nil, fmt.Errorf("to_markdown failed to select <body>: %w", err)
+				if CurrentElement == nil {
+					return nil, fmt.Errorf("no element selected: use load_url and element-selection tools first")
 				}
-				CurrentElement = body
-			}
-			if CurrentElement == nil {
-				return nil, fmt.Errorf("no element selected: use load_url and element-selection tools first")
-			}
-			// Describe current element to get backend node ID
-			props, err := CurrentElement.Describe(0, false)
-			if err != nil {
-				return nil, fmt.Errorf("describe element failed: %w", err)
-			}
-			// Query the accessibility tree
-			tree, err := proto.AccessibilityQueryAXTree{BackendNodeID: props.BackendNodeID}.Call(Page)
-			if err != nil {
-				return nil, fmt.Errorf("accessibility query failed: %w", err)
-			}
-			// Generate structured Markdown using shared converter
-			md := convertAXTreeToMarkdown(tree, Page)
-			log.Printf("[MCP] TOOL to_markdown RESULT length=%d", len(md))
-			return mcp.NewToolResultText(md), nil
+				// Describe current element to get backend node ID
+				props, err := CurrentElement.Describe(0, false)
+				if err != nil {
+					return nil, fmt.Errorf("describe element failed: %w", err)
+				}
+				// Query the accessibility tree
+				tree, err := proto.AccessibilityQueryAXTree{BackendNodeID: props.BackendNodeID}.Call(Page)
+				if err != nil {
+					return nil, fmt.Errorf("accessibility query failed: %w", err)
+				}
+				// Generate structured Markdown using shared converter
+				md := convertAXTreeToMarkdown(tree, Page)
+				log.Printf("[MCP] TOOL to_markdown RESULT length=%d", len(md))
+				return mcp.NewToolResultText(md), nil
 			})
 		},
 	)
@@ -297,71 +307,71 @@ Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
 			return withPage(func() (*mcp.CallToolResult, error) {
 				log.Printf("[MCP] TOOL run_js CALLED args=%#v", req.Params.Arguments)
 
-			// extract showErrors flag
-			var showErrors bool
-			if v, ok := req.Params.Arguments["showErrors"].(bool); ok {
-				showErrors = v
-			}
-			if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
-				// Quickly probe the resource to ensure it is HTML before we open
-				// a full browser page. This prevents hangs/panics on plain-text,
-				// PDF or other non-HTML resources.
-				_, ctype, looksHTML, err := probeURL(raw, 32*1024)
-				if err != nil {
-					if showErrors {
-						return mcp.NewToolResultText(fmt.Sprintf("run_js probe error: %v", err)), nil
-					}
-					return nil, fmt.Errorf("run_js probe error: %w", err)
+				// extract showErrors flag
+				var showErrors bool
+				if v, ok := req.Params.Arguments["showErrors"].(bool); ok {
+					showErrors = v
 				}
-				if !looksHTML {
-					msg := fmt.Sprintf("run_js error: resource at %s is not HTML (Content-Type: %s)", raw, ctype)
-					if showErrors {
-						return mcp.NewToolResultText(msg), nil
+				if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
+					// Quickly probe the resource to ensure it is HTML before we open
+					// a full browser page. This prevents hangs/panics on plain-text,
+					// PDF or other non-HTML resources.
+					_, ctype, looksHTML, err := probeURL(raw, 32*1024)
+					if err != nil {
+						if showErrors {
+							return mcp.NewToolResultText(fmt.Sprintf("run_js probe error: %v", err)), nil
+						}
+						return nil, fmt.Errorf("run_js probe error: %w", err)
 					}
-					return nil, fmt.Errorf(msg)
-				}
+					if !looksHTML {
+						msg := fmt.Sprintf("run_js error: resource at %s is not HTML (Content-Type: %s)", raw, ctype)
+						if showErrors {
+							return mcp.NewToolResultText(msg), nil
+						}
+						return nil, fmt.Errorf(msg)
+					}
 
-				page, err := LoadURL(raw)
+					page, err := LoadURL(raw)
+					if err != nil {
+						if showErrors {
+							return mcp.NewToolResultText(fmt.Sprintf("run_js load_url error: %v", err)), nil
+						}
+						return nil, fmt.Errorf("run_js load_url error: %w", err)
+					}
+					body, err := page.Element("body")
+					if err != nil {
+						if showErrors {
+							return mcp.NewToolResultText(fmt.Sprintf("run_js failed to select <body>: %v", err)), nil
+						}
+						return nil, fmt.Errorf("run_js failed to select <body>: %w", err)
+					}
+					CurrentElement = body
+				}
+				script, _ := req.Params.Arguments["script"].(string)
+				if CurrentElement == nil {
+					if showErrors {
+						return mcp.NewToolResultText("run_js error: no element selected—call load_url first or provide url"), nil
+					}
+					return nil, fmt.Errorf("run_js error: no element selected—call load_url first or provide url")
+				}
+				// wrap any JS snippet in an IIFE so Element.Eval sees a function literal
+				wrapped := fmt.Sprintf("() => { return (%s); }", script)
+				value, err := CurrentElement.Eval(wrapped)
 				if err != nil {
 					if showErrors {
-						return mcp.NewToolResultText(fmt.Sprintf("run_js load_url error: %v", err)), nil
+						return mcp.NewToolResultText(fmt.Sprintf("run_js execution error: %v", err)), nil
 					}
-					return nil, fmt.Errorf("run_js load_url error: %w", err)
+					return nil, fmt.Errorf("run_js execution error: %w", err)
 				}
-				body, err := page.Element("body")
+				resultJSON, err := json.Marshal(value.Value)
 				if err != nil {
 					if showErrors {
-						return mcp.NewToolResultText(fmt.Sprintf("run_js failed to select <body>: %v", err)), nil
+						return mcp.NewToolResultText(fmt.Sprintf("run_js JSON marshal error: %v", err)), nil
 					}
-					return nil, fmt.Errorf("run_js failed to select <body>: %w", err)
+					return nil, fmt.Errorf("run_js JSON marshal error: %w", err)
 				}
-				CurrentElement = body
-			}
-			script, _ := req.Params.Arguments["script"].(string)
-			if CurrentElement == nil {
-				if showErrors {
-					return mcp.NewToolResultText("run_js error: no element selected—call load_url first or provide url"), nil
-				}
-				return nil, fmt.Errorf("run_js error: no element selected—call load_url first or provide url")
-			}
-			// wrap any JS snippet in an IIFE so Element.Eval sees a function literal
-			wrapped := fmt.Sprintf("() => { return (%s); }", script)
-			value, err := CurrentElement.Eval(wrapped)
-			if err != nil {
-				if showErrors {
-					return mcp.NewToolResultText(fmt.Sprintf("run_js execution error: %v", err)), nil
-				}
-				return nil, fmt.Errorf("run_js execution error: %w", err)
-			}
-			resultJSON, err := json.Marshal(value.Value)
-			if err != nil {
-				if showErrors {
-					return mcp.NewToolResultText(fmt.Sprintf("run_js JSON marshal error: %v", err)), nil
-				}
-				return nil, fmt.Errorf("run_js JSON marshal error: %w", err)
-			}
-			log.Printf("[MCP] TOOL run_js RESULT length=%d", len(resultJSON))
-			return mcp.NewToolResultText(string(resultJSON)), nil
+				log.Printf("[MCP] TOOL run_js RESULT length=%d", len(resultJSON))
+				return mcp.NewToolResultText(string(resultJSON)), nil
 			})
 		},
 	)

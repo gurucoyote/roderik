@@ -1,0 +1,27 @@
+MCP web-browser hang investigation (2025-10-07)
+
+Summary:
+- Initial calls to `web-browser__to_markdown` on https://example.com succeeded (length 234 markdown response).
+- After several successive requests (including multi-URL attempt, larger sites like cnn.com), all MCP web-browser tools began failing immediately with "tool call failed".
+
+Steps attempted:
+1. Deleted singleton files (`SingletonCookie`, `SingletonLock`, `SingletonSocket`) under `user_data`; no change.
+2. Removed entire `user_data` directory, recreated empty profile, and also restored from `user_data.bak`; tool still failed.
+3. Restarted `./roderik mcp` (with `RODERIK_ENABLE_LOAD_URL=1`), confirmed process running, but log file (`roderik-mcp.log`) stopped receiving new entries. Tool failures persisted even after killing/restarting the process multiple times.
+4. Verified no Chrome/Chromium processes running (`ps -o pid,comm,args`).
+5. Attempted MCP `shutdown` tool via `web-browser__shutdown`; call failed the same way, indicating the bridge cannot reach the MCP server.
+
+Observations:
+- `web-browser` tool now fails for every call (`to_markdown`, `duck`, `shutdown`), including the trivial https://www.example.com request.
+- `roderik-mcp.log` shows last successful tool call at 13:21:45 (to_markdown on cnn.com), nothing thereafter.
+- Suggestion: the issue is likely in the MCP bridge/host layer outside this workspace; may require restarting the higher-level service managing the web-browser MCP server.
+
+Follow-up (2025-10-07, afternoon):
+- Restarting the Codex CLI agent cleared the hang; example.com began working again immediately.
+- Hitting https://traumwind.de revealed a separate failure path: the MCP bridge raised a Unicode decode error because the site responds in ISO-8859-1.
+- Implemented a UTF-8 normalization path in `cmd/netprobe.go` and `cmd/mcp.go` so any non-HTML responses are transcoded using `golang.org/x/net/html/charset`. Added `decodeToUTF8` helper to replace invalid sequences with U+FFFD.
+- After rebuilding, the bridge returns Markdown/HTML for traumwind.de without errors, confirming the hang was independent and the charset bug is fixed.
+
+Follow-up (2025-10-07, evening):
+- Added a dedicated Go module under `examples/` so ad-hoc prototype code is ignored during root `go test ./...`.
+- Fixed go vet warnings in `cmd/root.go` (escaped `%USERPROFILE%`) and `cmd/markdown.go` (AX node zero checks). `GOSUMDB=off go test ./...` now succeeds, ensuring the UTF-8 fix builds cleanly.

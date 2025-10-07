@@ -1,6 +1,7 @@
 .aider*
 user_data
-examples
+examples/*
+!examples/go.mod
 roderik
 assets
 .env

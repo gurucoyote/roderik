@@ -423,11 +423,11 @@ var WinChromeCmd = &cobra.Command{
 		profCmd := exec.Command("cmd.exe", "/C", "echo", "%USERPROFILE%")
 		profOut, err := profCmd.Output()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "warning: failed to resolve %USERPROFILE%:", err)
+			fmt.Fprintf(os.Stderr, "warning: failed to resolve %%USERPROFILE%%: %v\n", err)
 		}
 		winProfile := strings.TrimSpace(string(profOut))
 		if winProfile == "" {
-			fmt.Fprintln(os.Stderr, "warning: %USERPROFILE% expanded to empty, using default data-dir")
+			fmt.Fprintln(os.Stderr, "warning: USERPROFILE expanded to empty, using default data-dir")
 		}
 		userDataDir := winProfile + `\AppData\Local\Google\Chrome\User Data\WSL2`
 		fmt.Println("using Windows user-data-dir =", userDataDir)

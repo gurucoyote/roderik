@@ -12,6 +12,8 @@ require (
 	github.com/mark3labs/mcp-go v0.24.1
 	github.com/spf13/cobra v1.8.1
 	github.com/ysmood/gson v0.7.3
+	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+	golang.org/x/text v0.3.0
 )
 
 replace github.com/metoro-io/mcp-golang => github.com/metoro-io/mcp-golang v0.11.0
@@ -27,6 +29,5 @@ require (
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect
 	github.com/ysmood/leakless v0.9.0 // indirect
-	golang.org/x/net v0.0.0-20200202094626-16171245cfb2 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 )
