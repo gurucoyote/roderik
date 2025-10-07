@@ -20,3 +20,20 @@ The current application lacks the ability to efficiently search for and navigate
 - The feature should integrate seamlessly with existing navigation and interaction commands.
 - Performance should be optimized to handle large DOMs efficiently.
 - User feedback should be clear, indicating the current position within the list and any errors encountered.
+
+## User Story: MCP Client Search via Roderik MCP Server
+
+**As** an MCP client operator using the roderik MCP server  
+**I want** to capture a session where DuckDuckGo is queried for “Martin Spernau books and publications”  
+**So that** future teammates understand the end-to-end workflow and tool behavior in the MCP context.
+
+### Scenario: Execute DuckDuckGo search and record outcomes
+**Given** the user asked through the MCP client “please go to duckduckgo and search for Martin Spernau's books and publications”  
+**When** the operator (acting via the roderik MCP server tooling) loads `https://duckduckgo.com/`, focuses the main search field, and types the query text  
+**And** clicking the search button submits the form after an Enter keypress fails to trigger submission  
+**Then** the search results page is available for inspection and conversion to Markdown for reporting back through the MCP client.
+
+### Notes
+- Loading DuckDuckGo and typing the query worked as expected.  
+- Submitting by newline did not trigger the search, so the search button was clicked instead.  
+- Re-running the Markdown conversion provided the full results after an initial empty response.

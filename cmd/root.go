@@ -75,6 +75,11 @@ var (
 	activeEventLog *EventLog
 )
 
+var (
+	desktopConnector   = connectToWindowsDesktopChrome
+	prepareBrowserFunc = PrepareBrowser
+)
+
 func setActiveEventLog(log *EventLog) {
 	eventLogMu.Lock()
 	activeEventLog = log
@@ -157,6 +162,43 @@ func ensurePageEventHandlers(p *rod.Page) {
 	pageEventPage = p
 }
 
+func ensurePageReady() error {
+	if Desktop {
+		if Browser != nil && Page != nil {
+			return nil
+		}
+		logFn := func(format string, a ...interface{}) {
+			if Verbose {
+				fmt.Fprintf(os.Stderr, format, a...)
+			}
+		}
+		if _, _, err := desktopConnector(logFn); err != nil {
+			return err
+		}
+		if Page == nil {
+			return fmt.Errorf("desktop chrome attached but no page available")
+		}
+		return nil
+	}
+
+	if Browser == nil || Page == nil {
+		tmp, err := prepareBrowserFunc()
+		if err != nil {
+			Browser = nil
+			Page = nil
+			return err
+		}
+		Browser = tmp
+		if Stealth {
+			Page = stealth.MustPage(Browser)
+		} else {
+			Page = Browser.MustPage("about:blank")
+		}
+	}
+
+	return nil
+}
+
 var RootCmd = &cobra.Command{
 	Use:   "roderik",
 	Short: "A command-line tool for web scraping and automation",
@@ -168,13 +210,17 @@ var RootCmd = &cobra.Command{
 		}
 
 		if Desktop {
+			if cmd.Name() == "mcp" {
+				browserInitErr = nil
+				return
+			}
 			if Browser == nil {
 				logFn := func(format string, a ...interface{}) {
 					if Verbose {
 						fmt.Fprintf(os.Stderr, format, a...)
 					}
 				}
-				if _, _, err := connectToWindowsDesktopChrome(logFn); err != nil {
+				if _, _, err := desktopConnector(logFn); err != nil {
 					browserInitErr = err
 					Page = nil
 					Browser = nil
@@ -187,7 +233,7 @@ var RootCmd = &cobra.Command{
 
 		if Page == nil {
 			// Prepare the browser
-			tmp, err := PrepareBrowser()
+			tmp, err := prepareBrowserFunc()
 			if err != nil {
 				browserInitErr = err
 				Page = nil

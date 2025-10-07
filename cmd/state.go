@@ -26,6 +26,9 @@ func withPage[R any](fn func() (R, error)) (R, error) {
 	select {
 	case <-locked:
 		defer pageMu.Unlock()
+		if err := ensurePageReady(); err != nil {
+			return zero, err
+		}
 		return fn()
 	case <-time.After(timeout):
 		return zero, fmt.Errorf("page busy: could not acquire lock within %s", timeout)
