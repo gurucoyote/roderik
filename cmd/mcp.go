@@ -185,6 +185,102 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
+	s.AddTool(
+		mcp.NewTool(
+			"text",
+			mcp.WithDescription("Print the text of the current element, optionally truncating to a specified length."),
+			mcp.WithNumber("length", mcp.Description("optional maximum number of characters to return")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL text CALLED args=%#v", req.Params.Arguments)
+				var lengthPtr *int
+				if v, ok := req.Params.Arguments["length"].(float64); ok {
+					l := int(v)
+					lengthPtr = &l
+				}
+				text, err := mcpText(lengthPtr)
+				if err != nil {
+					return nil, err
+				}
+				log.Printf("[MCP] TOOL text RESULT length=%d", len(text))
+				return mcp.NewToolResultText(text), nil
+			})
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"box",
+			mcp.WithDescription("Get the bounding box of the current element."),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL box CALLED")
+				msg, err := mcpBox()
+				if err != nil {
+					return nil, err
+				}
+				log.Printf("[MCP] TOOL box RESULT length=%d", len(msg))
+				return mcp.NewToolResultText(msg), nil
+			})
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"computedstyles",
+			mcp.WithDescription("Output the computed styles of the current element in JSON format."),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL computedstyles CALLED")
+				msg, err := mcpComputedStyles()
+				if err != nil {
+					return nil, err
+				}
+				log.Printf("[MCP] TOOL computedstyles RESULT length=%d", len(msg))
+				return mcp.NewToolResultText(msg), nil
+			})
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"describe",
+			mcp.WithDescription("Describe the current element as formatted JSON."),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL describe CALLED")
+				desc, err := mcpDescribe()
+				if err != nil {
+					return nil, err
+				}
+				log.Printf("[MCP] TOOL describe RESULT length=%d", len(desc))
+				return mcp.NewToolResultText(desc), nil
+			})
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"xpath",
+			mcp.WithDescription("Get the optimized XPath of the current element."),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return withPage(func() (*mcp.CallToolResult, error) {
+				log.Printf("[MCP] TOOL xpath CALLED")
+				xpath, err := mcpXPath()
+				if err != nil {
+					return nil, err
+				}
+				log.Printf("[MCP] TOOL xpath RESULT length=%d", len(xpath))
+				return mcp.NewToolResultText(xpath), nil
+			})
+		},
+	)
+
 	var shutdownOnce sync.Once
 
 	s.AddTool(

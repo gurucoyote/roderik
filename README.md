@@ -44,6 +44,7 @@ Roderik ships with an MCP server (`go run ./cmd/mcp.go`) that mirrors the CLI co
 - The element discovery tools (`search`, `head`, `elem`) return numbered summaries of the matches and highlight the currently focused index. Follow-up navigation commands can jump directly to the `n`th element by passing `index` to `next`/`prev`.
 - `child`/`parent` reuse the same focus list, so the numbered summaries stay in sync as you traverse the DOM.
 - `html` emits the outer HTML of the focused node; use this after narrowing to the desired index.
+- `computedstyles` returns the focused element’s computed CSS as JSON, matching the `roderik computedstyles` CLI output.
 - `click` and `type` mirror the CLI behaviour, reuse the shared focus list, and report whether fallbacks were needed (href navigation or JS value injection).
 - `run_js` now requires an already-selected element—it no longer accepts a `url` parameter. Clients should `load_url` and navigate before running scripts.
 - When the MCP server is started with `--desktop`, the Windows Chrome session is launched lazily: the GUI only appears once a tool actually needs the browser, avoiding unnecessary pop-ups for non-browsing sessions.

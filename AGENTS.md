@@ -9,6 +9,7 @@
 ## Build, Test, and Development Commands
 - `go build ./...` — compile the CLI and verify module wiring.
 - `GOCACHE=$(pwd)/.cache GOMODCACHE=$(pwd)/.modcache go test ./...` — run unit and integration tests using local caches (required when network egress is blocked).
+- `./cache-and-test.sh` — populate `.cache`/`.modcache` and invoke `go test ./cmd/...` without external network access; prefer this helper when running the suite in restricted environments.
 - `./roderik <url>` — launch the interactive browser session against a target URL.
 - `go run ./cmd/mcp.go` — start the MCP server variant for agent integrations.
 
