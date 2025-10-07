@@ -26,6 +26,9 @@ var ElemCmd = &cobra.Command{
 		}
 		selector := args[0]
 		element, err := CurrentElement.Element(selector)
+		if err != nil && Page != nil {
+			element, err = Page.Element(selector)
+		}
 		if err != nil {
 			fmt.Println("Error navigating to the element:", err)
 			return

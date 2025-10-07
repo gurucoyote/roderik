@@ -71,6 +71,8 @@ var CurrentElement *rod.Element
 var Desktop bool // Indicates we have attached to a desktop Chrome instance
 var tempUserDataDir string
 var browserInitErr error
+var desktopWSURL string
+var desktopHostUsed string
 
 var RootCmd = &cobra.Command{
 	Use:   "roderik",
@@ -78,8 +80,25 @@ var RootCmd = &cobra.Command{
 	Long:  `Roderik is a command-line tool that allows you to navigate, inspect, and interact with elements on a webpage. It uses the Go Rod library for web scraping and automation. You can use it to walk through the DOM, get information about elements, and perform actions like clicking or typing.`,
 	Args:  cobra.MinimumNArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// If we’re attaching to an existing Windows Chrome, skip auto-launch headless preparation
-		if cmd.Name() == "win-chrome" || Desktop {
+		if cmd.Name() == "win-chrome" {
+			return
+		}
+
+		if Desktop {
+			if Browser == nil {
+				logFn := func(format string, a ...interface{}) {
+					if Verbose {
+						fmt.Fprintf(os.Stderr, format, a...)
+					}
+				}
+				if _, _, err := connectToWindowsDesktopChrome(logFn); err != nil {
+					browserInitErr = err
+					Page = nil
+					Browser = nil
+					return
+				}
+			}
+			browserInitErr = nil
 			return
 		}
 
@@ -238,7 +257,13 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	// setup event listener for navigate events
 	go Page.EachEvent(func(e *proto.PageFrameNavigated) {
 		fmt.Fprintln(os.Stderr, "Navigated to:", e.Frame.URL)
-		CurrentElement = Page.MustElement("body")
+		if el, err := Page.Timeout(5 * time.Second).Element("body"); err == nil {
+			CurrentElement = el
+			elementList = nil
+			currentIndex = 0
+		} else if Verbose {
+			fmt.Fprintf(os.Stderr, "warning: failed to reset body after navigation: %v\n", err)
+		}
 	})()
 	// setup event listener for dialogs
 	go Page.EachEvent(func(e *proto.PageJavascriptDialogOpening) {
@@ -263,12 +288,10 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 		})()
 	}
 
-	err := Page.Navigate(targetURL)
-	if err != nil {
+	if err := Page.Navigate(targetURL); err != nil {
 		return nil, err
 	}
-	// wait for full load and idle so injected helpers are ready
-	Page.MustWaitLoad().MustWaitIdle()
+	Page.MustWaitLoad()
 	return Page, nil
 }
 
@@ -355,6 +378,14 @@ var ExitCmd = &cobra.Command{
 	Long:    `This command will exit the application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Goodbye!")
+		if Browser != nil {
+			if err := Browser.Close(); err != nil && Verbose {
+				fmt.Fprintf(os.Stderr, "warning: failed to close browser: %v\n", err)
+			}
+		}
+		Browser = nil
+		Page = nil
+		CurrentElement = nil
 		os.Exit(0)
 	},
 }
@@ -415,158 +446,186 @@ func findChromeOnWindows() (string, error) {
 	return winPath, nil
 }
 
+func connectToWindowsDesktopChrome(logf func(string, ...interface{})) (string, string, error) {
+	if logf == nil {
+		logf = func(string, ...interface{}) {}
+	}
+
+	if Browser != nil && Desktop {
+		logf("reusing existing desktop Chrome session\n")
+		return desktopWSURL, desktopHostUsed, nil
+	}
+
+	isWSL := false
+	if runtime.GOOS != "windows" {
+		if data, err := os.ReadFile("/proc/version"); err == nil {
+			if bytes.Contains(data, []byte("Microsoft")) {
+				isWSL = true
+			}
+		}
+	}
+
+	hosts := []string{"127.0.0.1", "localhost"}
+	if isWSL {
+		resolv, err := os.ReadFile("/etc/resolv.conf")
+		if err != nil {
+			return "", "", fmt.Errorf("cannot read resolv.conf: %w", err)
+		}
+		var hostIP string
+		for _, line := range strings.Split(string(resolv), "\n") {
+			if strings.HasPrefix(line, "nameserver") {
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					hostIP = parts[1]
+				}
+				break
+			}
+		}
+		if hostIP == "" {
+			return "", "", fmt.Errorf("could not determine host IP from /etc/resolv.conf")
+		}
+		logf("using host IP = %s\n", hostIP)
+		hosts = append([]string{hostIP}, hosts...)
+	}
+
+	winChrome, err := findChromeOnWindows()
+	if err != nil {
+		return "", "", err
+	}
+
+	profCmd := exec.Command("cmd.exe", "/C", "echo", "%USERPROFILE%")
+	profOut, err := profCmd.Output()
+	if err != nil {
+		logf("warning: failed to resolve %%USERPROFILE%%: %v\n", err)
+	}
+	winProfile := strings.TrimSpace(string(profOut))
+	if winProfile == "" {
+		logf("warning: USERPROFILE expanded to empty, using default data-dir\n")
+	}
+	userDataDir := winProfile + `\AppData\Local\Google\Chrome\User Data\WSL2`
+	logf("using Windows user-data-dir = %s\n", userDataDir)
+
+	args0 := []string{
+		"/C", "start", "",
+		winChrome,
+		"--remote-debugging-port=9222",
+		"--remote-debugging-address=0.0.0.0",
+		"--user-data-dir=" + userDataDir,
+		"--no-first-run",
+		"--no-default-browser-check",
+	}
+	logf("spawning cmd.exe %v\n", args0)
+	cmd0 := exec.Command("cmd.exe", args0...)
+	if err := cmd0.Start(); err != nil {
+		return "", "", fmt.Errorf("failed to start Windows Chrome: %w", err)
+	}
+
+	var (
+		wsURL    string
+		hostUsed string
+	)
+	const (
+		maxAttempts = 20
+		pause       = 300 * time.Millisecond
+	)
+	for _, h := range hosts {
+		for i := 0; i < maxAttempts; i++ {
+			time.Sleep(pause)
+			u := fmt.Sprintf("http://%s:9222/json/version", h)
+			logf("  polling %s (try %d/%d)\n", u, i+1, maxAttempts)
+			resp, err := http.Get(u)
+			if err != nil {
+				logf("    GET error: %v\n", err)
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				logf("    HTTP status: %d\n", resp.StatusCode)
+				resp.Body.Close()
+				continue
+			}
+			body, _ := ioutil.ReadAll(resp.Body)
+			resp.Body.Close()
+			var info map[string]interface{}
+			if err := json.Unmarshal(body, &info); err != nil {
+				logf("    JSON error: %v\n", err)
+				continue
+			}
+			if s, ok := info["webSocketDebuggerUrl"].(string); ok {
+				wsURL = s
+				hostUsed = h
+				break
+			}
+		}
+		if wsURL != "" {
+			break
+		}
+		logf("no debugger URL on host %s, trying next\n", h)
+	}
+	if wsURL == "" {
+		return "", "", fmt.Errorf("could not get WebSocket URL – is Chrome running with --remote-debugging?")
+	}
+	logf("raw wsURL = %s\n", wsURL)
+
+	if strings.Contains(wsURL, "0.0.0.0") && hostUsed != "" {
+		wsURL = strings.Replace(wsURL, "0.0.0.0", hostUsed, 1)
+		logf("rewrote wsURL to %s\n", wsURL)
+	}
+
+	logf("connecting to WebSocket URL: %s\n", wsURL)
+	browser := rod.New().ControlURL(wsURL)
+	if err := browser.Connect(); err != nil {
+		return "", "", fmt.Errorf("failed to connect to Chrome DevTools at %s: %w", wsURL, err)
+	}
+	Browser = browser.Timeout(30 * time.Second)
+	pages, err := Browser.Pages()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to list Chrome pages: %w", err)
+	}
+	if len(pages) == 0 {
+		Page = Browser.MustPage("").Context(context.Background())
+	} else {
+		Page = pages[0].Context(context.Background())
+		if _, err := Page.Activate(); err != nil && Verbose {
+			fmt.Fprintf(os.Stderr, "warning: failed to activate first page: %v\n", err)
+		}
+	}
+	if body, err := Page.Timeout(5 * time.Second).Element("body"); err == nil {
+		CurrentElement = body
+	}
+	Desktop = true
+	desktopWSURL = wsURL
+	desktopHostUsed = hostUsed
+
+	return wsURL, hostUsed, nil
+}
+
 var WinChromeCmd = &cobra.Command{
 	Use:   "win-chrome",
 	Short: "Launch and attach to Windows Chrome from WSL2",
 	Long:  `Launches Chrome on Windows via WSL2, connects to it, and navigates to https://traumwind.de.`,
-	// TODO if this succeeds, set the global Page and Desktop vars
 	Run: func(cmd *cobra.Command, args []string) {
-		// 1) detect WSL2 vs native Windows and prepare hosts list
-		isWSL := false
-		if runtime.GOOS != "windows" {
-			if data, err := os.ReadFile("/proc/version"); err == nil {
-				if bytes.Contains(data, []byte("Microsoft")) {
-					isWSL = true
-				}
-			}
+		logFn := func(format string, a ...interface{}) {
+			fmt.Printf(format, a...)
 		}
-		var hosts []string
-		if isWSL {
-			// WSL2: derive host IP from nameserver
-			resolv, err := os.ReadFile("/etc/resolv.conf")
-			if err != nil {
-				fmt.Println("cannot read resolv.conf:", err)
-				return
-			}
-			var hostIP string
-			for _, line := range strings.Split(string(resolv), "\n") {
-				if strings.HasPrefix(line, "nameserver") {
-					parts := strings.Fields(line)
-					if len(parts) >= 2 {
-						hostIP = parts[1]
-					}
-					break
-				}
-			}
-			if hostIP == "" {
-				fmt.Println("could not determine host IP")
-				return
-			}
-			fmt.Println("using host IP =", hostIP)
-			hosts = []string{hostIP, "127.0.0.1", "localhost"}
-		} else {
-			// native Windows: use loopback only
-			hosts = []string{"127.0.0.1"}
-		}
-
-		// 2) launch Windows Chrome
-		winChrome, err := findChromeOnWindows()
+		fmt.Fprintln(os.Stderr, "[deprecated] win-chrome will be removed; prefer --desktop")
+		wsURL, hostUsed, err := connectToWindowsDesktopChrome(logFn)
 		if err != nil {
-			fmt.Println("Could not locate Windows Chrome:", err)
+			fmt.Println("Could not attach to Windows Chrome:", err)
 			return
 		}
-		// 2a) find the real Windows user profile so Chrome can read/write the data dir
-		profCmd := exec.Command("cmd.exe", "/C", "echo", "%USERPROFILE%")
-		profOut, err := profCmd.Output()
+		targetURL := "https://traumwind.de"
+		if len(args) > 0 {
+			targetURL = args[0]
+		}
+		var page *rod.Page
+		page, err = LoadURL(targetURL)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to resolve %%USERPROFILE%%: %v\n", err)
-		}
-		winProfile := strings.TrimSpace(string(profOut))
-		if winProfile == "" {
-			fmt.Fprintln(os.Stderr, "warning: USERPROFILE expanded to empty, using default data-dir")
-		}
-		userDataDir := winProfile + `\AppData\Local\Google\Chrome\User Data\WSL2`
-		fmt.Println("using Windows user-data-dir =", userDataDir)
-		args0 := []string{
-			"/C", "start", "",
-			winChrome,
-			"--remote-debugging-port=9222",
-			"--remote-debugging-address=0.0.0.0",
-			"--user-data-dir=" + userDataDir,
-			"--no-first-run",
-			"--no-default-browser-check",
-		}
-		fmt.Println("spawning cmd.exe", args0)
-		cmd0 := exec.Command("cmd.exe", args0...)
-		if err := cmd0.Start(); err != nil {
-			fmt.Println("failed to start Windows Chrome:", err)
+			fmt.Println("Error loading URL:", err)
 			return
 		}
-
-		// 3) wait & poll /json/version on multiple possible hosts
-		var wsURL, hostUsed string
-		const (
-			maxAttempts = 20
-			pause       = 300 * time.Millisecond
-		)
-		// hosts list initialized above
-		for _, h := range hosts {
-			for i := 0; i < maxAttempts; i++ {
-				time.Sleep(pause)
-				u := fmt.Sprintf("http://%s:9222/json/version", h)
-				fmt.Printf("  polling %s (try %d/%d)\n", u, i+1, maxAttempts)
-				resp, err := http.Get(u)
-				if err != nil {
-					fmt.Printf("    GET error: %v\n", err)
-					continue
-				}
-				if resp.StatusCode != http.StatusOK {
-					fmt.Printf("    HTTP status: %d\n", resp.StatusCode)
-					resp.Body.Close()
-					continue
-				}
-				body, _ := ioutil.ReadAll(resp.Body)
-				resp.Body.Close()
-				var info map[string]interface{}
-				if err := json.Unmarshal(body, &info); err != nil {
-					fmt.Printf("    JSON error: %v\n", err)
-					continue
-				}
-				if s, ok := info["webSocketDebuggerUrl"].(string); ok {
-					wsURL = s
-					hostUsed = h
-					break
-				}
-			}
-			if wsURL != "" {
-				break
-			}
-			fmt.Printf("no debugger URL on host %s, trying next\n", h)
-		}
-		if wsURL == "" {
-			fmt.Println("Could not get WebSocket URL – is Chrome running with --remote-debugging?")
-			return
-		}
-		fmt.Println("raw wsURL =", wsURL)
-
-		// 4) rewrite any 0.0.0.0 in the WS URL to the actual host we used
-		if strings.Contains(wsURL, "0.0.0.0") && hostUsed != "" {
-			wsURL = strings.Replace(wsURL, "0.0.0.0", hostUsed, 1)
-			fmt.Println("rewrote wsURL to", wsURL)
-		}
-
-		// 5) before dialing, show the exact WebSocket URL
-		fmt.Println("connecting to WebSocket URL:", wsURL)
-
-		// 5) finally connect: attach to remote, then lift any per-call deadlines
-		Browser = rod.New().
-			ControlURL(wsURL).
-			MustConnect()
-
-		// bump the default timeout for all subsequent operations
-		Browser = Browser.Timeout(30 * time.Second)
-
-		// 6) clear per-page deadline, navigate, and wait for full load
-		Page = Browser.
-			MustPage("about:blank").
-			Context(context.Background())
-		Page.MustNavigate("https://traumwind.de")
-		Page.MustWaitLoad().MustWaitIdle()
-
-		// 7) prime the current element to <body>
-		CurrentElement = Page.MustElement("body")
-
-		Desktop = true
+		Page = page
+		Interactive = true
+		fmt.Printf("Desktop session ready via host %s (ws=%s)\n", hostUsed, wsURL)
 	},
 }
 
@@ -576,6 +635,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose mode")
 	RootCmd.PersistentFlags().BoolVarP(&IgnoreCertErrors, "ignore-cert-errors", "k", false, "Ignore certificate errors") // Register the new flag
 	RootCmd.PersistentFlags().BoolVarP(&Stealth, "stealth", "s", false, "Enable stealth mode")
+	RootCmd.PersistentFlags().BoolVarP(&Desktop, "desktop", "d", false, "Attach to Windows desktop Chrome (WSL2 only)")
 
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)

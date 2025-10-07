@@ -33,3 +33,13 @@
 ## Chromium Launch Profiles
 - Prefer the shared `user_data/` profile; the launcher now auto-falls back to disposable profiles for parallel sessions—retain this behavior in future changes.
 - Always remove temporary profile directories in deferred cleanup paths to prevent lock conflicts.
+
+## WSL2 ↔ Windows Chrome Attachment
+- Use the `--desktop` flag (`roderik --desktop <url>`) to attach to the Windows Chrome instance. The CLI now reuses the first DevTools page instead of spawning an extra `about:blank` tab, so the visible window mirrors the interactive shell.
+- The launcher starts Windows Chrome via `cmd.exe` with `--remote-debugging-port=9222` and a dedicated `WSL2` profile. Confirm the port is reachable from WSL by either allowing it through the Windows firewall (`New-NetFirewallRule -Direction Inbound -Protocol TCP -LocalPort 9222 -RemoteAddress <WSL_IP>`) or forwarding it with `netsh interface portproxy`/SSH when Chrome binds to `127.0.0.1`.
+- Navigation hooks reset the active element after each page load; commands like `search`, `elem`, and `click` now track the desktop browser when you navigate in the GUI. If a real click times out, the shell falls back to the element’s `href` so link traversal continues.
+- Avoid calling DevTools tools that assume “network idle” (e.g., `Page.MustWaitIdle`) against long-lived pages; they now wait only for the initial load event to prevent `context deadline exceeded` errors.
+
+## Windows Builds
+- Cross-compile the CLI with `GOOS=windows GOARCH=amd64 GOCACHE=$(pwd)/.cache GOMODCACHE=$(pwd)/.modcache go build -o roderik.exe .`; the cached module directories avoid sandbox DNS restrictions.
+- Run the resulting `roderik.exe --desktop <url>` from PowerShell or Command Prompt. Because it attaches directly to the Windows Chrome DevTools socket, no WSL tunneling is required—just ensure port 9222 stays open as described above.
