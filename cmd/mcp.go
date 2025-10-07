@@ -450,6 +450,40 @@ func runMCP(cmd *cobra.Command, args []string) {
 				})
 			},
 		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"click",
+				mcp.WithDescription("Click the currently focused element; falls back to href navigation or synthetic click on failure."),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					msg, err := mcpClick()
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
+
+		s.AddTool(
+			mcp.NewTool(
+				"type",
+				mcp.WithDescription("Type text into the currently focused element; trims optional quotes and falls back to JavaScript value injection."),
+				mcp.WithString("text", mcp.Required(), mcp.Description("Text to type")),
+			),
+			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return withPage(func() (*mcp.CallToolResult, error) {
+					text, _ := req.Params.Arguments["text"].(string)
+					msg, err := mcpType(text)
+					if err != nil {
+						return nil, err
+					}
+					return mcp.NewToolResultText(msg), nil
+				})
+			},
+		)
 	}
 
 	// === Execute arbitrary JS on the page and return JSON results ===
