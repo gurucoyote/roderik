@@ -109,11 +109,12 @@ var RootCmd = &cobra.Command{
 			return
 		}
 
-		// headings, _ := Page.Elements("h1, h2, h3, h4, h5, h6")
-		var headings []*rod.Element
-		for _, tag := range []string{"h1", "h2", "h3", "h4", "h5", "h6"} {
-			elems, _ := Page.Elements(tag)
-			headings = append(headings, elems...)
+		headings, err := queryElements(Page, "h1, h2, h3, h4, h5, h6")
+		if err != nil {
+			if Verbose {
+				fmt.Println("Error finding headings:", err)
+			}
+			headings = nil
 		}
 		// setup navigable heading list
 		elementList = headings

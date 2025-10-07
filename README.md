@@ -32,6 +32,9 @@ As of now, this is very muc a WiP.
 It kida already works, with most basic interaction and inspection commands present.
 It very much needs refining and better error handling etc.
 
+Recent reliability tweaks:
+- Heading discovery (`head`, initial load) now evaluates the DOM through an inline function, preventing Rod's cached helper from occasionally disappearing and halting navigation.
+
 ## Similar
 
 This is a successor to my earlier attempt, called willbrowser, which was written in nodejs and the playwright framework. https://github.com/gurucoyote/willbrowser
