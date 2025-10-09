@@ -219,10 +219,6 @@ var RootCmd = &cobra.Command{
 	Long:  `Roderik is a command-line tool that allows you to navigate, inspect, and interact with elements on a webpage. It uses the Go Rod library for web scraping and automation. You can use it to walk through the DOM, get information about elements, and perform actions like clicking or typing.`,
 	Args:  cobra.MinimumNArgs(1),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if cmd.Name() == "win-chrome" {
-			return
-		}
-
 		if Desktop {
 			logFn := func(format string, a ...interface{}) {
 				if Verbose {
@@ -708,42 +704,6 @@ func connectToWindowsDesktopChrome(logf func(string, ...interface{})) (string, s
 	return wsURL, hostUsed, nil
 }
 
-var WinChromeCmd = &cobra.Command{
-	Use:   "win-chrome",
-	Short: "Launch and attach to Windows Chrome from WSL2",
-	Long:  `Launches Chrome on Windows via WSL2, connects to it, and navigates to https://traumwind.de.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		logFn := func(format string, a ...interface{}) {
-			fmt.Printf(format, a...)
-		}
-
-		if err := ensureDesktopProfileSelection(logFn); err != nil {
-			fmt.Println("Could not prepare profile selection:", err)
-			return
-		}
-
-		fmt.Fprintln(os.Stderr, "[deprecated] win-chrome will be removed; prefer --desktop")
-		wsURL, hostUsed, err := connectToWindowsDesktopChrome(logFn)
-		if err != nil {
-			fmt.Println("Could not attach to Windows Chrome:", err)
-			return
-		}
-		targetURL := "https://traumwind.de"
-		if len(args) > 0 {
-			targetURL = args[0]
-		}
-		var page *rod.Page
-		page, err = LoadURL(targetURL)
-		if err != nil {
-			fmt.Println("Error loading URL:", err)
-			return
-		}
-		Page = page
-		Interactive = true
-		fmt.Printf("Desktop session ready via host %s (ws=%s)\n", hostUsed, wsURL)
-	},
-}
-
 func init() {
 	RootCmd.PersistentFlags().BoolVarP(&ShowNetActivity, "net-activity", "n", false, "Enable display of network events")
 	RootCmd.PersistentFlags().BoolVarP(&Interactive, "interactive", "i", false, "Enable interactive mode")
@@ -761,5 +721,4 @@ func init() {
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)
 	RootCmd.AddCommand(ReloadCmd)
-	RootCmd.AddCommand(WinChromeCmd)
 }
