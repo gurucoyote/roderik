@@ -37,6 +37,7 @@
 
 ## WSL2 ↔ Windows Chrome Attachment
 - Use the `--desktop` flag (`roderik --desktop <url>`) to attach to the Windows Chrome instance. Running the native `roderik.exe` on Windows avoids WSL firewall issues; see `docs/profile-management-plan.md` for profile selection and naming plans, and `docs/wsl-windows-legacy.md` for the older WSL-only workflow.
+- `--profile-name` selects a Chrome profile directory, `--profile-prompt` opens an interactive picker (uses survey), and `--profile-title` applies a friendly window label by editing Chrome’s `Local State`.
 - Navigation hooks reset the active element after each page load; commands like `search`, `elem`, and `click` now track the desktop browser when you navigate in the GUI. If a real click times out, the shell falls back to the element’s `href` so link traversal continues.
 - `type` accepts multiple words and strips optional wrapping quotes before sending keys, matching common CLI usage (e.g., `type "roderik browser"`).
 - When native typing stalls (common in desktop attach mode), the CLI falls back to injecting the value via JavaScript and dispatching `input`/`change` events, keeping form fields in sync.
