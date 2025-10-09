@@ -30,11 +30,7 @@ func ensureDesktopProfileSelection(logf func(string, ...interface{})) error {
 		return nil
 	}
 	desktopProfileSelectionDone = true
-
-	defaultDir := profileDefaultFlag
-	if defaultDir == "" {
-		defaultDir = defaultDesktopProfileDir
-	}
+	defaultDir := defaultDesktopProfileDir
 
 	userDataRootWin, err := resolveWindowsUserDataRoot(logf)
 	if err != nil {
@@ -66,7 +62,7 @@ func ensureDesktopProfileSelection(logf func(string, ...interface{})) error {
 	if !hasProfileDir(options, defaultDir) {
 		options = append(options, profileOption{
 			Dir:      defaultDir,
-			Friendly: friendlyNames[defaultDir],
+			Friendly: friendlyNameFor(friendlyNames, defaultDir),
 			Path:     filepath.Join(fsRoot, defaultDir),
 			Exists:   false,
 		})
@@ -77,22 +73,26 @@ func ensureDesktopProfileSelection(logf func(string, ...interface{})) error {
 		created  bool
 	)
 
-	if profileNameFlag != "" {
-		selected = chooseOptionByDir(options, profileNameFlag)
+	if strings.TrimSpace(profileFlag) != "" {
+		dirName := strings.TrimSpace(profileFlag)
+		selected = chooseOptionByDir(options, dirName)
 		if selected.Dir == "" {
 			selected = profileOption{
-				Dir:      profileNameFlag,
-				Friendly: friendlyNames[profileNameFlag],
-				Path:     filepath.Join(fsRoot, profileNameFlag),
+				Dir:      dirName,
+				Friendly: friendlyNameFor(friendlyNames, dirName),
+				Path:     filepath.Join(fsRoot, dirName),
 				Exists:   false,
 			}
 		}
+		if info, err := os.Stat(selected.Path); err == nil && info.IsDir() {
+			selected.Exists = true
+		}
+		if selected.Friendly == "" {
+			selected.Friendly = dirName
+		}
 	} else {
 		shouldPrompt := term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
-		if profilePrompt && !shouldPrompt {
-			logf("warning: --profile-prompt requested but no interactive terminal available; falling back to default\n")
-		}
-		if (profilePrompt || profileNameFlag == "") && shouldPrompt {
+		if shouldPrompt {
 			selected, created, err = promptForProfile(options, fsRoot, defaultDir, friendlyNames)
 			if err != nil {
 				return err
@@ -102,7 +102,7 @@ func ensureDesktopProfileSelection(logf func(string, ...interface{})) error {
 			if selected.Dir == "" {
 				selected = profileOption{
 					Dir:      defaultDir,
-					Friendly: friendlyNames[defaultDir],
+					Friendly: friendlyNameFor(friendlyNames, defaultDir),
 					Path:     filepath.Join(fsRoot, defaultDir),
 					Exists:   false,
 				}
@@ -114,12 +114,26 @@ func ensureDesktopProfileSelection(logf func(string, ...interface{})) error {
 		selected = profileOption{
 			Dir:      defaultDesktopProfileDir,
 			Path:     filepath.Join(fsRoot, defaultDesktopProfileDir),
-			Friendly: friendlyNames[defaultDesktopProfileDir],
+			Friendly: friendlyNameFor(friendlyNames, defaultDesktopProfileDir),
 		}
+	}
+
+	needCreate := false
+	if info, err := os.Stat(selected.Path); err != nil {
+		if os.IsNotExist(err) {
+			needCreate = true
+		} else {
+			return err
+		}
+	} else if info.IsDir() {
+		selected.Exists = true
 	}
 
 	if err := ensureProfileDirectory(selected.Path); err != nil {
 		return err
+	}
+	if needCreate {
+		created = true
 	}
 
 	resolvedDesktopProfileDir = selected.Dir
@@ -128,6 +142,9 @@ func ensureDesktopProfileSelection(logf func(string, ...interface{})) error {
 	if profileTitleFlag != "" {
 		resolvedDesktopProfileTitle = profileTitleFlag
 		applyDesktopProfileTitle = true
+	} else if strings.TrimSpace(profileFlag) != "" {
+		resolvedDesktopProfileTitle = firstNonEmpty(strings.TrimSpace(profileFlag), selected.Friendly, selected.Dir)
+		applyDesktopProfileTitle = resolvedDesktopProfileTitle != ""
 	} else if created {
 		resolvedDesktopProfileTitle = firstNonEmpty(selected.Friendly, selected.Dir)
 		applyDesktopProfileTitle = resolvedDesktopProfileTitle != ""
@@ -303,6 +320,21 @@ func readChromeProfileNames(localStatePath string) (map[string]string, error) {
 	return result, nil
 }
 
+func friendlyNameFor(m map[string]string, dir string) string {
+	if dir == "" {
+		return ""
+	}
+	if v, ok := m[dir]; ok {
+		return v
+	}
+	for k, v := range m {
+		if strings.EqualFold(k, dir) {
+			return v
+		}
+	}
+	return ""
+}
+
 func discoverProfileOptions(fsRoot string, friendly map[string]string) ([]profileOption, error) {
 	var options []profileOption
 	entries, err := os.ReadDir(fsRoot)
@@ -317,7 +349,7 @@ func discoverProfileOptions(fsRoot string, friendly map[string]string) ([]profil
 			name := entry.Name()
 			options = append(options, profileOption{
 				Dir:      name,
-				Friendly: friendly[name],
+				Friendly: friendlyNameFor(friendly, name),
 				Path:     filepath.Join(fsRoot, name),
 				Exists:   true,
 			})

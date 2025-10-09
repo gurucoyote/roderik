@@ -6,21 +6,19 @@ This document captures the planned improvements for handling Chrome/Chromium pro
 
 - Allow users to choose which browser profile Roderik should use, instead of hard-coding `WSL2`.
 - Provide an interactive picker that lists available profiles and lets users create new ones.
-- Support scripted usage via a `--profile-name` flag while still offering interactive selection.
+- Support scripted usage via a `--profile` flag while still offering interactive selection.
 - Automatically rename the Windows profile so Chrome windows show a recognizable title.
 - Keep headless/Linux launches in sync with desktop behavior.
 
 ## User-Facing Changes
 
 1. **Flags**
-   - `--profile-name`, `-P`: explicitly pick a profile directory.
-   - `--profile-prompt`: force the interactive profile picker.
-   - `--profile-default`: preferred profile if no explicit selection is made.
-   - `--profile-title`: friendly name to write into the Chrome profile metadata (Windows only).
+   - `--profile`: explicitly pick a profile directory (omit to be prompted).
+   - `--profile-title`: friendly name to write into the Chrome profile metadata (Windows only); defaults to the `--profile` value when supplied.
 
 2. **Interactive Picker**
    - Implemented with `github.com/AlecAivazis/survey/v2`.
-   - Triggered automatically when no `--profile-name` is provided (or when `--profile-prompt` is set).
+   - Triggered automatically when no `--profile` is provided.
    - Lists existing profiles with friendly names (from `Local State`) and directory identifiers.
    - Includes an option to “Create new profile…”, prompting for name and directory.
 
@@ -69,7 +67,7 @@ This document captures the planned improvements for handling Chrome/Chromium pro
 6. **Future Enhancements (optional)**
    - `roderik profiles list`: CLI subcommand to list available profiles without launching Chrome.
    - Persist “last used” profile per host in a config file (`~/.config/roderik/config.json`) and auto-select unless overridden.
-   - Autocomplete for `--profile-name` based on discovered directories.
+   - Autocomplete for `--profile` based on discovered directories.
 
 ## Risks & Mitigations
 
@@ -82,4 +80,4 @@ This document captures the planned improvements for handling Chrome/Chromium pro
 - Unit tests for profile enumeration and `Local State` parsing.
 - Tests for new flag parsing logic.
 - Integration test (tagged) that simulates the survey prompt via injected stdin.
-- Manual validation: run `./cache-and-test.sh`, then `roderik --desktop --profile-prompt` on both Linux (headless) and Windows builds.
+- Manual validation: run `./cache-and-test.sh`, then `roderik --desktop` on both Linux (headless) and Windows builds to exercise the interactive prompt.

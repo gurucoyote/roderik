@@ -83,11 +83,8 @@ var (
 const defaultDesktopProfileDir = "WSL2"
 
 var (
-	profileNameFlag    string
-	profilePrompt      bool
-	profileDefaultFlag = defaultDesktopProfileDir
-	profileTitleFlag   string
-
+	profileFlag                 string
+	profileTitleFlag            string
 	resolvedDesktopProfileDir   = defaultDesktopProfileDir
 	resolvedDesktopProfileTitle string
 	applyDesktopProfileTitle    bool
@@ -711,11 +708,9 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&IgnoreCertErrors, "ignore-cert-errors", "k", false, "Ignore certificate errors") // Register the new flag
 	RootCmd.PersistentFlags().BoolVarP(&Stealth, "stealth", "s", false, "Enable stealth mode")
 	RootCmd.PersistentFlags().BoolVarP(&Desktop, "desktop", "d", false, "Attach to Windows desktop Chrome (WSL2 only)")
-	RootCmd.PersistentFlags().StringVar(&profileNameFlag, "profile-name", "", "Chrome profile directory to use for sessions")
-	RootCmd.PersistentFlags().StringVar(&profileNameFlag, "desktop-profile", "", "Deprecated alias for --profile-name")
-	RootCmd.PersistentFlags().BoolVar(&profilePrompt, "profile-prompt", false, "Prompt to select a Chrome profile before launch")
-	RootCmd.PersistentFlags().StringVar(&profileDefaultFlag, "profile-default", profileDefaultFlag, "Default Chrome profile directory when selection is required")
-	RootCmd.PersistentFlags().StringVar(&profileTitleFlag, "profile-title", "", "Friendly name to apply to the selected Chrome profile")
+	RootCmd.PersistentFlags().StringVar(&profileFlag, "profile", "", "Chrome profile directory to use (omit to pick interactively)")
+	RootCmd.PersistentFlags().StringVar(&profileFlag, "desktop-profile", "", "Deprecated alias for --profile")
+	RootCmd.PersistentFlags().StringVar(&profileTitleFlag, "profile-title", "", "Override the friendly window title for the selected profile")
 	RootCmd.PersistentFlags().StringVar(&profileTitleFlag, "desktop-profile-title", "", "Deprecated alias for --profile-title")
 
 	RootCmd.AddCommand(ClearCmd)
