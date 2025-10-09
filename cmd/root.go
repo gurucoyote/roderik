@@ -80,6 +80,13 @@ var (
 	prepareBrowserFunc = PrepareBrowser
 )
 
+const defaultDesktopProfileDir = "WSL2"
+
+var (
+	desktopProfileDir   = defaultDesktopProfileDir
+	desktopProfileTitle string
+)
+
 func setActiveEventLog(log *EventLog) {
 	eventLogMu.Lock()
 	activeEventLog = log
@@ -584,8 +591,19 @@ func connectToWindowsDesktopChrome(logf func(string, ...interface{})) (string, s
 	if winProfile == "" {
 		logf("warning: USERPROFILE expanded to empty, using default data-dir\n")
 	}
-	userDataDir := winProfile + `\AppData\Local\Google\Chrome\User Data\WSL2`
+	userDataRoot := winProfile + `\AppData\Local\Google\Chrome\User Data`
+	profileDirName := desktopProfileDir
+	if profileDirName == "" {
+		profileDirName = defaultDesktopProfileDir
+	}
+	userDataDir := userDataRoot + `\` + profileDirName
 	logf("using Windows user-data-dir = %s\n", userDataDir)
+
+	if desktopProfileTitle != "" {
+		if err := ensureDesktopProfileTitle(logf, userDataRoot, profileDirName, desktopProfileTitle); err != nil {
+			logf("warning: unable to set profile title: %v\n", err)
+		}
+	}
 
 	args0 := []string{
 		"/C", "start", "",
@@ -718,9 +736,116 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&IgnoreCertErrors, "ignore-cert-errors", "k", false, "Ignore certificate errors") // Register the new flag
 	RootCmd.PersistentFlags().BoolVarP(&Stealth, "stealth", "s", false, "Enable stealth mode")
 	RootCmd.PersistentFlags().BoolVarP(&Desktop, "desktop", "d", false, "Attach to Windows desktop Chrome (WSL2 only)")
+	RootCmd.PersistentFlags().StringVar(&desktopProfileDir, "desktop-profile", defaultDesktopProfileDir, "Windows Chrome profile directory to use for --desktop sessions")
+	RootCmd.PersistentFlags().StringVar(&desktopProfileTitle, "desktop-profile-title", "", "Friendly name to apply to the Windows Chrome profile when using --desktop")
 
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)
 	RootCmd.AddCommand(ReloadCmd)
 	RootCmd.AddCommand(WinChromeCmd)
+}
+
+func ensureDesktopProfileTitle(logf func(string, ...interface{}), userDataRootWin, profileDir, title string) error {
+	if title == "" {
+		return nil
+	}
+
+	localStatePath, err := resolveLocalStatePath(userDataRootWin)
+	if err != nil {
+		return fmt.Errorf("resolve Local State path: %w", err)
+	}
+	if err := updateChromeLocalState(localStatePath, profileDir, title); err != nil {
+		return fmt.Errorf("update Local State: %w", err)
+	}
+	logf("set Chrome profile %s title to %q via %s\n", profileDir, title, localStatePath)
+	return nil
+}
+
+func resolveLocalStatePath(userDataRootWin string) (string, error) {
+	localStateWin := userDataRootWin + `\Local State`
+	if runtime.GOOS == "windows" {
+		return localStateWin, nil
+	}
+
+	localStatePath, err := windowsToWSLPath(localStateWin)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(localStatePath), 0755); err != nil {
+		return "", err
+	}
+	return localStatePath, nil
+}
+
+func windowsToWSLPath(winPath string) (string, error) {
+	cmd := exec.Command("wslpath", "-u", winPath)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("wslpath conversion failed for %s: %w", winPath, err)
+	}
+	linuxPath := strings.TrimSpace(string(out))
+	if linuxPath == "" {
+		return "", fmt.Errorf("empty path after wslpath conversion for %s", winPath)
+	}
+	return linuxPath, nil
+}
+
+func updateChromeLocalState(localStatePath, profileDir, title string) error {
+	var data map[string]interface{}
+
+	raw, err := os.ReadFile(localStatePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		data = make(map[string]interface{})
+	} else {
+		if len(bytes.TrimSpace(raw)) == 0 {
+			data = make(map[string]interface{})
+		} else if err := json.Unmarshal(raw, &data); err != nil {
+			return fmt.Errorf("parse Local State: %w", err)
+		}
+	}
+	if data == nil {
+		data = make(map[string]interface{})
+	}
+
+	profileObj, _ := data["profile"].(map[string]interface{})
+	if profileObj == nil {
+		profileObj = make(map[string]interface{})
+	}
+	infoCache, _ := profileObj["info_cache"].(map[string]interface{})
+	if infoCache == nil {
+		infoCache = make(map[string]interface{})
+	}
+	entry, _ := infoCache[profileDir].(map[string]interface{})
+	if entry == nil {
+		entry = make(map[string]interface{})
+	}
+
+	entry["name"] = title
+	entry["is_using_default_name"] = false
+	infoCache[profileDir] = entry
+	profileObj["info_cache"] = infoCache
+	data["profile"] = profileObj
+
+	encoded, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(localStatePath), 0755); err != nil {
+		return err
+	}
+
+	mode := os.FileMode(0644)
+	if fi, err := os.Stat(localStatePath); err == nil {
+		mode = fi.Mode()
+	}
+
+	tmpPath := localStatePath + ".tmp"
+	if err := os.WriteFile(tmpPath, encoded, mode); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, localStatePath)
 }
