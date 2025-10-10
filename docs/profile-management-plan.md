@@ -68,6 +68,7 @@ This document captures the planned improvements for handling Chrome/Chromium pro
    - `roderik profiles list`: CLI subcommand to list available profiles without launching Chrome.
    - Persist “last used” profile per host in a config file (`~/.config/roderik/config.json`) and auto-select unless overridden.
    - Autocomplete for `--profile` based on discovered directories.
+   - Mirror the Windows desktop picker inside the headless `PrepareBrowser` path so TTY sessions can interactively choose or create profiles backed by `user_data/` directories.
 
 ## Risks & Mitigations
 
@@ -81,3 +82,11 @@ This document captures the planned improvements for handling Chrome/Chromium pro
 - Tests for new flag parsing logic.
 - Integration test (tagged) that simulates the survey prompt via injected stdin.
 - Manual validation: run `./cache-and-test.sh`, then `roderik --desktop` on both Linux (headless) and Windows builds to exercise the interactive prompt.
+
+### MCP Mode
+
+- The MCP server (`roderik --desktop mcp ...`) never invokes the interactive profile selector. Provide the profile via `--profile` when attaching to Windows Chrome, otherwise the default `WSL2` directory is used silently.
+
+## Known Issues (October 2025)
+
+- **Windows desktop title remains unchanged**: On 2025-10-09 we reproduced that launching `roderik.exe --desktop --profile=<name>` against a Windows-hosted Chrome instance still shows the default `Page Title - Google Chrome` caption instead of the friendly profile label. The CLI updates both `Local State` and `Preferences`, but Chrome appears to cache the window title until the profile is reloaded by another Chrome UI surface (e.g., manual renaming inside Chrome). Until we find a reliable programmatic hook, the workaround is to rename the profile once from Chrome’s profile picker; subsequent Roderik launches continue using the cached title. We’ve paused further automation attempts for now.

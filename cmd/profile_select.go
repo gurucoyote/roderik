@@ -191,21 +191,131 @@ func ensureDesktopProfileTitle(logf func(string, ...interface{}), userDataRootWi
 	if title == "" {
 		return nil
 	}
+	if logf == nil {
+		logf = func(string, ...interface{}) {}
+	}
 
 	localStatePath, err := resolveLocalStatePath(userDataRootWin)
 	if err != nil {
 		return fmt.Errorf("resolve Local State path: %w", err)
 	}
-	if err := updateChromeLocalState(localStatePath, profileDir, title); err != nil {
+	_, err = updateChromeLocalState(localStatePath, profileDir, title)
+	if err != nil {
 		return fmt.Errorf("update Local State: %w", err)
 	}
 	logf("set Chrome profile %s title to %q via %s\n", profileDir, title, localStatePath)
+
+	profileDir = strings.TrimSpace(profileDir)
+	if profileDir == "" {
+		return nil
+	}
+
+	profileRootWin := userDataRootWin + `\` + profileDir
+	profileLocalStatePath, err := resolveLocalStatePath(profileRootWin)
+	if err != nil {
+		logf("warning: unable to resolve profile Local State for %s: %v\n", profileDir, err)
+		return nil
+	}
+	profileUpdatedKeys, err := updateChromeLocalState(profileLocalStatePath, "", title)
+	if err != nil {
+		logf("warning: unable to update profile Local State for %s via %s: %v\n", profileDir, profileLocalStatePath, err)
+		return nil
+	}
+	logf("set Chrome profile %s title to %q via %s\n", profileDir, title, profileLocalStatePath)
+	if len(profileUpdatedKeys) == 0 {
+		logf("warning: no profile entries updated in %s\n", profileLocalStatePath)
+	}
+
+	applyProfilePreferences(logf, profileRootWin, profileUpdatedKeys, title)
 	return nil
 }
 
 func resolveLocalStatePath(userDataRootWin string) (string, error) {
 	localStateWin := userDataRootWin + `\Local State`
 	return windowsToHostPath(localStateWin)
+}
+
+func ensureDesktopProfileSelectionNonInteractive(logf func(string, ...interface{})) error {
+	if desktopProfileSelectionDone {
+		return nil
+	}
+	desktopProfileSelectionDone = true
+	if logf == nil {
+		logf = func(string, ...interface{}) {}
+	}
+
+	defaultDir := defaultDesktopProfileDir
+
+	userDataRootWin, err := resolveWindowsUserDataRoot(logf)
+	if err != nil {
+		return err
+	}
+
+	localStatePath, err := resolveLocalStatePath(userDataRootWin)
+	if err != nil {
+		return err
+	}
+	friendlyNames, err := readChromeProfileNames(localStatePath)
+	if err != nil {
+		logf("warning: unable to read profile names from %s: %v\n", localStatePath, err)
+		friendlyNames = map[string]string{}
+	}
+
+	fsRoot, err := windowsToHostPath(userDataRootWin)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(fsRoot, 0755); err != nil {
+		return err
+	}
+
+	dirName := strings.TrimSpace(profileFlag)
+	if dirName == "" {
+		dirName = defaultDir
+	}
+	friendly := friendlyNameFor(friendlyNames, dirName)
+	profilePath := filepath.Join(fsRoot, dirName)
+
+	created := false
+	if info, err := os.Stat(profilePath); err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(profilePath, 0755); err != nil {
+				return err
+			}
+			created = true
+		} else {
+			return err
+		}
+	} else if !info.IsDir() {
+		return fmt.Errorf("profile path %s exists but is not a directory", profilePath)
+	}
+
+	resolvedDesktopProfileDir = dirName
+
+	switch {
+	case profileTitleFlag != "":
+		resolvedDesktopProfileTitle = profileTitleFlag
+		applyDesktopProfileTitle = true
+	case strings.TrimSpace(profileFlag) != "":
+		resolvedDesktopProfileTitle = firstNonEmpty(strings.TrimSpace(profileFlag), friendly, dirName)
+		applyDesktopProfileTitle = resolvedDesktopProfileTitle != ""
+	case created:
+		resolvedDesktopProfileTitle = firstNonEmpty(friendly, dirName)
+		applyDesktopProfileTitle = resolvedDesktopProfileTitle != ""
+	case friendly != "":
+		resolvedDesktopProfileTitle = friendly
+		applyDesktopProfileTitle = true
+	default:
+		resolvedDesktopProfileTitle = ""
+		applyDesktopProfileTitle = false
+	}
+
+	fmt.Fprintf(os.Stderr, "[profile] using dir=%s title=%q\n", resolvedDesktopProfileDir, resolvedDesktopProfileTitle)
+	if created {
+		fmt.Fprintf(os.Stderr, "[profile] created new profile dir=%s at %s\n", resolvedDesktopProfileDir, profilePath)
+	}
+
+	return nil
 }
 
 func windowsToHostPath(winPath string) (string, error) {
@@ -224,20 +334,20 @@ func windowsToHostPath(winPath string) (string, error) {
 	return linuxPath, nil
 }
 
-func updateChromeLocalState(localStatePath, profileDir, title string) error {
+func updateChromeLocalState(localStatePath, profileDir, title string) ([]string, error) {
 	var data map[string]interface{}
 
 	raw, err := os.ReadFile(localStatePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return err
+			return nil, err
 		}
 		data = make(map[string]interface{})
 	} else {
 		if len(bytes.TrimSpace(raw)) == 0 {
 			data = make(map[string]interface{})
 		} else if err := json.Unmarshal(raw, &data); err != nil {
-			return fmt.Errorf("parse Local State: %w", err)
+			return nil, fmt.Errorf("parse Local State: %w", err)
 		}
 	}
 	if data == nil {
@@ -252,24 +362,39 @@ func updateChromeLocalState(localStatePath, profileDir, title string) error {
 	if infoCache == nil {
 		infoCache = make(map[string]interface{})
 	}
-	entry, _ := infoCache[profileDir].(map[string]interface{})
-	if entry == nil {
-		entry = make(map[string]interface{})
+
+	targetKeys := resolveProfileInfoCacheKeys(infoCache, profileObj, profileDir)
+	if len(targetKeys) == 0 {
+		return nil, fmt.Errorf("no profile entries available to update in Local State at %s", localStatePath)
 	}
 
-	entry["name"] = title
-	entry["is_using_default_name"] = false
-	infoCache[profileDir] = entry
+	updatedKeys := make([]string, 0, len(targetKeys))
+	for _, key := range targetKeys {
+		actualKey := findInfoCacheKey(infoCache, key)
+		if actualKey == "" {
+			actualKey = key
+		}
+		entry, _ := infoCache[actualKey].(map[string]interface{})
+		if entry == nil {
+			entry = make(map[string]interface{})
+		}
+
+		entry["name"] = title
+		entry["is_using_default_name"] = false
+		infoCache[actualKey] = entry
+		updatedKeys = append(updatedKeys, actualKey)
+	}
+
 	profileObj["info_cache"] = infoCache
 	data["profile"] = profileObj
 
 	encoded, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := os.MkdirAll(filepath.Dir(localStatePath), 0755); err != nil {
-		return err
+		return nil, err
 	}
 
 	mode := os.FileMode(0644)
@@ -279,9 +404,144 @@ func updateChromeLocalState(localStatePath, profileDir, title string) error {
 
 	tmpPath := localStatePath + ".tmp"
 	if err := os.WriteFile(tmpPath, encoded, mode); err != nil {
+		return nil, err
+	}
+	if err := os.Rename(tmpPath, localStatePath); err != nil {
+		return nil, err
+	}
+	return updatedKeys, nil
+}
+
+func applyProfilePreferences(logf func(string, ...interface{}), profileRootWin string, profileDirs []string, title string) {
+	for _, dir := range profileDirs {
+		dir = strings.TrimSpace(dir)
+		if dir == "" {
+			continue
+		}
+		preferencesWin := profileRootWin + `\` + dir + `\Preferences`
+		preferencesPath, err := windowsToHostPath(preferencesWin)
+		if err != nil {
+			logf("warning: unable to resolve Preferences for %s: %v\n", dir, err)
+			continue
+		}
+		if err := updateChromePreferences(preferencesPath, title); err != nil {
+			logf("warning: unable to update Preferences for %s via %s: %v\n", dir, preferencesPath, err)
+			continue
+		}
+		logf("set Chrome profile %s preferences title to %q via %s\n", dir, title, preferencesPath)
+	}
+}
+
+func updateChromePreferences(preferencesPath, title string) error {
+	var data map[string]interface{}
+
+	raw, err := os.ReadFile(preferencesPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		data = make(map[string]interface{})
+	} else {
+		if len(bytes.TrimSpace(raw)) == 0 {
+			data = make(map[string]interface{})
+		} else if err := json.Unmarshal(raw, &data); err != nil {
+			return fmt.Errorf("parse Preferences: %w", err)
+		}
+	}
+	if data == nil {
+		data = make(map[string]interface{})
+	}
+
+	profileObj, _ := data["profile"].(map[string]interface{})
+	if profileObj == nil {
+		profileObj = make(map[string]interface{})
+	}
+	profileObj["name"] = title
+	profileObj["is_using_default_name"] = false
+	data["profile"] = profileObj
+
+	if err := os.MkdirAll(filepath.Dir(preferencesPath), 0755); err != nil {
 		return err
 	}
-	return os.Rename(tmpPath, localStatePath)
+
+	mode := os.FileMode(0644)
+	if fi, err := os.Stat(preferencesPath); err == nil {
+		mode = fi.Mode()
+	}
+
+	tmpPath := preferencesPath + ".tmp"
+	encoded, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(tmpPath, encoded, mode); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, preferencesPath)
+}
+
+func resolveProfileInfoCacheKeys(infoCache, profileObj map[string]interface{}, profileDir string) []string {
+	add := func(targets []string, candidate string) []string {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			return targets
+		}
+		for _, existing := range targets {
+			if strings.EqualFold(existing, candidate) {
+				return targets
+			}
+		}
+		return append(targets, candidate)
+	}
+
+	targets := make([]string, 0, 3)
+
+	if profileDir != "" {
+		targets = add(targets, profileDir)
+	} else {
+		if v, ok := profileObj["last_active_profile"].(string); ok {
+			targets = add(targets, v)
+		}
+
+		if arr, ok := profileObj["last_active_profiles"].([]interface{}); ok {
+			for _, raw := range arr {
+				if s, ok := raw.(string); ok {
+					targets = add(targets, s)
+					break
+				}
+			}
+		}
+	}
+
+	if len(targets) == 0 && len(infoCache) == 1 {
+		for k := range infoCache {
+			targets = add(targets, k)
+		}
+	}
+
+	if len(infoCache) > 0 && len(targets) == 0 {
+		if _, ok := infoCache["Default"]; ok {
+			targets = add(targets, "Default")
+		}
+	}
+
+	if len(targets) == 0 {
+		targets = add(targets, "Default")
+	}
+
+	return targets
+}
+
+func findInfoCacheKey(infoCache map[string]interface{}, target string) string {
+	if target == "" {
+		return ""
+	}
+	for k := range infoCache {
+		if strings.EqualFold(k, target) {
+			return k
+		}
+	}
+	return ""
 }
 
 func readChromeProfileNames(localStatePath string) (map[string]string, error) {

@@ -19,6 +19,7 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/go-rod/stealth"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -89,6 +90,8 @@ var (
 	resolvedDesktopProfileTitle string
 	applyDesktopProfileTitle    bool
 	desktopProfileSelectionDone bool
+	resolvedLocalProfileDir     string
+	pendingRootTarget           string
 )
 
 func setActiveEventLog(log *EventLog) {
@@ -214,13 +217,25 @@ var RootCmd = &cobra.Command{
 	Use:   "roderik",
 	Short: "A command-line tool for web scraping and automation",
 	Long:  `Roderik is a command-line tool that allows you to navigate, inspect, and interact with elements on a webpage. It uses the Go Rod library for web scraping and automation. You can use it to walk through the DOM, get information about elements, and perform actions like clicking or typing.`,
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		args = extractTargetFromProfileFlag(cmd, args)
 		if Desktop {
 			logFn := func(format string, a ...interface{}) {
 				if Verbose {
 					fmt.Fprintf(os.Stderr, format, a...)
 				}
+			}
+
+			if cmd.Name() == "mcp" {
+				if err := ensureDesktopProfileSelectionNonInteractive(logFn); err != nil {
+					browserInitErr = err
+					Page = nil
+					Browser = nil
+					return
+				}
+				browserInitErr = nil
+				return
 			}
 
 			if err := ensureDesktopProfileSelection(logFn); err != nil {
@@ -230,10 +245,6 @@ var RootCmd = &cobra.Command{
 				return
 			}
 
-			if cmd.Name() == "mcp" {
-				browserInitErr = nil
-				return
-			}
 			if Browser == nil {
 				if _, _, err := desktopConnector(logFn); err != nil {
 					browserInitErr = err
@@ -274,8 +285,20 @@ var RootCmd = &cobra.Command{
 			fmt.Println("Error preparing browser: browser not initialized")
 			return
 		}
-		// set interactive mode for this root command by default
-		Interactive = true
+		args = normalizeRootCmdArgs(args)
+		if len(args) == 0 {
+			fmt.Println("Error: target URL argument is required")
+			return
+		}
+
+		if cmd.Flags().Changed("interactive") {
+			value, err := cmd.Flags().GetBool("interactive")
+			if err == nil {
+				Interactive = value
+			}
+		} else {
+			Interactive = term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+		}
 
 		targetURL := args[0]
 		// Load the target URL
@@ -317,13 +340,26 @@ var RootCmd = &cobra.Command{
 }
 
 func PrepareBrowser() (*rod.Browser, error) {
-	// Ensure user data directory exists
-	userDataDir := filepath.Join(".", "user_data")
-	if _, err := os.Stat(userDataDir); os.IsNotExist(err) {
-		err = os.Mkdir(userDataDir, 0755)
-		if err != nil {
+	baseUserDataDir := filepath.Join(".", "user_data")
+	if err := os.MkdirAll(baseUserDataDir, 0755); err != nil {
+		return nil, err
+	}
+
+	profileDirName, err := sanitizeProfileDirName(profileFlag)
+	if err != nil {
+		return nil, err
+	}
+
+	userDataDir := baseUserDataDir
+	if profileDirName != "" {
+		userDataDir = filepath.Join(baseUserDataDir, profileDirName)
+		if err := os.MkdirAll(userDataDir, 0755); err != nil {
 			return nil, err
 		}
+		resolvedLocalProfileDir = userDataDir
+		fmt.Fprintf(os.Stderr, "[profile] using local dir=%s\n", userDataDir)
+	} else {
+		resolvedLocalProfileDir = userDataDir
 	}
 
 	// Get the browser executable path
@@ -348,7 +384,7 @@ func PrepareBrowser() (*rod.Browser, error) {
 
 	controlURL, err := launchWithProfile(userDataDir)
 	if err != nil && isProfileLockError(err) {
-		tempDir, mkErr := os.MkdirTemp(userDataDir, "profile-")
+		tempDir, mkErr := os.MkdirTemp(baseUserDataDir, "profile-")
 		if mkErr != nil {
 			return nil, fmt.Errorf("failed to create temporary user data dir: %w", mkErr)
 		}
@@ -364,6 +400,52 @@ func PrepareBrowser() (*rod.Browser, error) {
 	browser := rod.New().ControlURL(controlURL).MustConnect()
 
 	return browser, nil
+}
+
+func sanitizeProfileDirName(input string) (string, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return "", nil
+	}
+	if trimmed == "." || trimmed == ".." {
+		return "", fmt.Errorf("profile directory cannot be %q", trimmed)
+	}
+	if strings.ContainsAny(trimmed, "/\\") {
+		return "", fmt.Errorf("profile directory %q may not contain path separators", input)
+	}
+	if strings.ContainsRune(trimmed, ':') {
+		return "", fmt.Errorf("profile directory %q may not contain ':'", input)
+	}
+	return trimmed, nil
+}
+
+func normalizeRootCmdArgs(args []string) []string {
+	if len(args) > 0 {
+		pendingRootTarget = ""
+		return args
+	}
+	if pendingRootTarget != "" {
+		args = []string{pendingRootTarget}
+		pendingRootTarget = ""
+	}
+	return args
+}
+
+func extractTargetFromProfileFlag(cmd *cobra.Command, args []string) []string {
+	if len(args) > 0 {
+		pendingRootTarget = ""
+		return args
+	}
+	candidate := strings.TrimSpace(profileFlag)
+	if candidate == "" || !isValidURL(candidate) {
+		return args
+	}
+	if err := cmd.Flags().Set("profile", ""); err != nil && Verbose {
+		fmt.Fprintf(os.Stderr, "warning: failed to reset profile flag: %v\n", err)
+	}
+	profileFlag = ""
+	pendingRootTarget = candidate
+	return args
 }
 
 func isProfileLockError(err error) bool {
@@ -709,9 +791,10 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&Stealth, "stealth", "s", false, "Enable stealth mode")
 	RootCmd.PersistentFlags().BoolVarP(&Desktop, "desktop", "d", false, "Attach to Windows desktop Chrome (WSL2 only)")
 	RootCmd.PersistentFlags().StringVar(&profileFlag, "profile", "", "Chrome profile directory to use (omit to pick interactively)")
-	RootCmd.PersistentFlags().StringVar(&profileFlag, "desktop-profile", "", "Deprecated alias for --profile")
 	RootCmd.PersistentFlags().StringVar(&profileTitleFlag, "profile-title", "", "Override the friendly window title for the selected profile")
-	RootCmd.PersistentFlags().StringVar(&profileTitleFlag, "desktop-profile-title", "", "Deprecated alias for --profile-title")
+	if pf := RootCmd.PersistentFlags().Lookup("profile"); pf != nil {
+		pf.NoOptDefVal = ""
+	}
 
 	RootCmd.AddCommand(ClearCmd)
 	RootCmd.AddCommand(ExitCmd)
