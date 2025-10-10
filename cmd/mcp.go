@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,10 +17,13 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
+	"roderik/browser"
 )
 
 // path to the MCP debug log file, override with --log
 var mcpLogPath string
+
+const inlineBinaryLimit = 512 * 1024
 
 // LoadURLArgs is the JSON schema for the load_url tool.
 type LoadURLArgs struct {
@@ -206,6 +210,55 @@ func runMCP(cmd *cobra.Command, args []string) {
 				log.Printf("[MCP] TOOL text RESULT length=%d", len(text))
 				return mcp.NewToolResultText(text), nil
 			})
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"capture_screenshot",
+			mcp.WithDescription("Capture a screenshot of the current page or an optional URL."),
+			mcp.WithString("url", mcp.Description("optional URL to load before capturing the screenshot")),
+			mcp.WithString("selector", mcp.Description("optional CSS selector to capture a specific element")),
+			mcp.WithBoolean("full_page", mcp.Description("capture the entire page by resizing the viewport")),
+			mcp.WithBoolean("scroll", mcp.Description("scroll and stitch the entire page without resizing the viewport")),
+			mcp.WithString("format", mcp.Description("image format: png or jpeg (default png)"), mcp.Enum("png", "jpeg", "jpg"), mcp.DefaultString("png")),
+			mcp.WithNumber("quality", mcp.Description("JPEG quality (0-100)")),
+			mcp.WithString("return", mcp.Description("delivery mode: binary (inline) or file (writes to disk and returns resource)"), mcp.Enum("binary", "file"), mcp.DefaultString("binary")),
+			mcp.WithString("output", mcp.Description("optional path to save the capture on disk when return=file")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL capture_screenshot CALLED args=%#v", req.Params.Arguments)
+			return mcpHandleCaptureScreenshot(req.Params.Arguments)
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"capture_pdf",
+			mcp.WithDescription("Render the current page or an optional URL to PDF."),
+			mcp.WithString("url", mcp.Description("optional URL to load before generating the PDF")),
+			mcp.WithBoolean("landscape", mcp.Description("render pages in landscape orientation")),
+			mcp.WithBoolean("header_footer", mcp.Description("display header and footer templates")),
+			mcp.WithBoolean("background", mcp.Description("print background graphics")),
+			mcp.WithNumber("scale", mcp.Description("scale factor for rendering (default 1.0)")),
+			mcp.WithNumber("paper_width", mcp.Description("paper width in inches")),
+			mcp.WithNumber("paper_height", mcp.Description("paper height in inches")),
+			mcp.WithNumber("margin_top", mcp.Description("top margin in inches")),
+			mcp.WithNumber("margin_bottom", mcp.Description("bottom margin in inches")),
+			mcp.WithNumber("margin_left", mcp.Description("left margin in inches")),
+			mcp.WithNumber("margin_right", mcp.Description("right margin in inches")),
+			mcp.WithString("page_ranges", mcp.Description("page ranges to print, e.g. '1-5,8'")),
+			mcp.WithString("header_template", mcp.Description("HTML template for the header")),
+			mcp.WithString("footer_template", mcp.Description("HTML template for the footer")),
+			mcp.WithBoolean("prefer_css_page_size", mcp.Description("prefer CSS-defined page size")),
+			mcp.WithBoolean("tagged", mcp.Description("generate tagged (accessible) PDF")),
+			mcp.WithBoolean("outline", mcp.Description("embed document outline in the PDF")),
+			mcp.WithString("return", mcp.Description("delivery mode: binary (embedded) or file (writes to disk)"), mcp.Enum("binary", "file"), mcp.DefaultString("binary")),
+			mcp.WithString("output", mcp.Description("optional path to save the PDF on disk when return=file")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL capture_pdf CALLED args=%#v", req.Params.Arguments)
+			return mcpHandleCapturePDF(req.Params.Arguments)
 		},
 	)
 
@@ -663,4 +716,233 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func boolArg(args map[string]interface{}, key string) bool {
+	if v, ok := args[key].(bool); ok {
+		return v
+	}
+	return false
+}
+
+func mcpHandleCaptureScreenshot(args map[string]interface{}) (*mcp.CallToolResult, error) {
+	return withPage(func() (*mcp.CallToolResult, error) {
+		rawURL := mcp.ExtractString(args, "url")
+		if strings.TrimSpace(rawURL) != "" {
+			if _, err := LoadURL(rawURL); err != nil {
+				return nil, fmt.Errorf("capture_screenshot load url %q: %w", rawURL, err)
+			}
+		}
+		if Page == nil {
+			return nil, fmt.Errorf("capture_screenshot: no page loaded – call load_url first or provide url")
+		}
+
+		selector := mcp.ExtractString(args, "selector")
+		fullPage := false
+		if v, ok := args["full_page"].(bool); ok {
+			fullPage = v
+		}
+		scroll := false
+		if v, ok := args["scroll"].(bool); ok {
+			scroll = v
+		}
+		if selector != "" && scroll {
+			return nil, fmt.Errorf("capture_screenshot: selector capture cannot be combined with scroll")
+		}
+		if selector != "" && fullPage {
+			return nil, fmt.Errorf("capture_screenshot: selector capture cannot be combined with full_page")
+		}
+		if scroll && fullPage {
+			return nil, fmt.Errorf("capture_screenshot: choose either scroll or full_page, not both")
+		}
+
+		format := strings.TrimSpace(strings.ToLower(mcp.ExtractString(args, "format")))
+		if format == "" {
+			format = "png"
+		}
+
+		var qualityPtr *int
+		if v, ok := args["quality"].(float64); ok {
+			q := int(v)
+			qualityPtr = &q
+		} else if format == "jpeg" || format == "jpg" {
+			q := 90
+			qualityPtr = &q
+		}
+
+		opts := browser.ScreenshotOptions{
+			Selector: selector,
+			FullPage: fullPage,
+			Scroll:   scroll,
+			Format:   format,
+			Quality:  qualityPtr,
+		}
+		result, err := captureScreenshotFunc(Page, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		delivery := strings.TrimSpace(strings.ToLower(mcp.ExtractString(args, "return")))
+		if delivery == "" {
+			delivery = "binary"
+		}
+		if delivery == "binary" && len(result.Data) > inlineBinaryLimit {
+			delivery = "file"
+		}
+
+		formatExt := "png"
+		if isJPEGFormat(format) {
+			formatExt = "jpg"
+		}
+
+		caption := fmt.Sprintf("Captured screenshot (%s, %d bytes).", result.MimeType, len(result.Data))
+		if selector != "" {
+			caption = fmt.Sprintf("Captured screenshot of %q (%s, %d bytes).", selector, result.MimeType, len(result.Data))
+		} else if rawURL != "" {
+			caption = fmt.Sprintf("Captured screenshot of %s (%s, %d bytes).", rawURL, result.MimeType, len(result.Data))
+		}
+
+		switch delivery {
+		case "file":
+			output := mcp.ExtractString(args, "output")
+			path, err := resolveOutputPath(output, "", "", "screenshot", formatExt)
+			if err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(path, result.Data, 0644); err != nil {
+				return nil, fmt.Errorf("capture_screenshot write file: %w", err)
+			}
+			payload := base64.StdEncoding.EncodeToString(result.Data)
+			resource := mcp.BlobResourceContents{
+				URI:      toFileURI(path),
+				MIMEType: result.MimeType,
+				Blob:     payload,
+			}
+			text := fmt.Sprintf("%s Saved to %s.", caption, path)
+			log.Printf("[MCP] TOOL capture_screenshot RESULT saved=%s bytes=%d", path, len(result.Data))
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.TextContent{Type: "text", Text: text},
+					mcp.EmbeddedResource{Type: "resource", Resource: resource},
+				},
+			}, nil
+		default:
+			payload := base64.StdEncoding.EncodeToString(result.Data)
+			log.Printf("[MCP] TOOL capture_screenshot RESULT inline bytes=%d", len(result.Data))
+			return mcp.NewToolResultImage(caption, payload, result.MimeType), nil
+		}
+	})
+}
+
+func mcpHandleCapturePDF(args map[string]interface{}) (*mcp.CallToolResult, error) {
+	return withPage(func() (*mcp.CallToolResult, error) {
+		rawURL := mcp.ExtractString(args, "url")
+		if strings.TrimSpace(rawURL) != "" {
+			if _, err := LoadURL(rawURL); err != nil {
+				return nil, fmt.Errorf("capture_pdf load url %q: %w", rawURL, err)
+			}
+		}
+		if Page == nil {
+			return nil, fmt.Errorf("capture_pdf: no page loaded – call load_url first or provide url")
+		}
+
+		opts := browser.PDFOptions{
+			Landscape:               boolArg(args, "landscape"),
+			DisplayHeaderFooter:     boolArg(args, "header_footer"),
+			PrintBackground:         boolArg(args, "background"),
+			PreferCSSPageSize:       boolArg(args, "prefer_css_page_size"),
+			GenerateTaggedPDF:       boolArg(args, "tagged"),
+			GenerateDocumentOutline: boolArg(args, "outline"),
+			PageRanges:              mcp.ExtractString(args, "page_ranges"),
+			HeaderTemplate:          mcp.ExtractString(args, "header_template"),
+			FooterTemplate:          mcp.ExtractString(args, "footer_template"),
+		}
+
+		if v, ok := args["scale"].(float64); ok {
+			val := v
+			opts.Scale = &val
+		}
+		if v, ok := args["paper_width"].(float64); ok {
+			val := v
+			opts.PaperWidth = &val
+		}
+		if v, ok := args["paper_height"].(float64); ok {
+			val := v
+			opts.PaperHeight = &val
+		}
+		if v, ok := args["margin_top"].(float64); ok {
+			val := v
+			opts.MarginTop = &val
+		}
+		if v, ok := args["margin_bottom"].(float64); ok {
+			val := v
+			opts.MarginBottom = &val
+		}
+		if v, ok := args["margin_left"].(float64); ok {
+			val := v
+			opts.MarginLeft = &val
+		}
+		if v, ok := args["margin_right"].(float64); ok {
+			val := v
+			opts.MarginRight = &val
+		}
+
+		result, err := capturePDFFunc(Page, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		delivery := strings.TrimSpace(strings.ToLower(mcp.ExtractString(args, "return")))
+		if delivery == "" {
+			delivery = "binary"
+		}
+		if delivery == "binary" && len(result.Data) > inlineBinaryLimit {
+			delivery = "file"
+		}
+
+		caption := fmt.Sprintf("Captured PDF (%d bytes).", len(result.Data))
+		if rawURL != "" {
+			caption = fmt.Sprintf("Captured PDF of %s (%d bytes).", rawURL, len(result.Data))
+		}
+
+		payload := base64.StdEncoding.EncodeToString(result.Data)
+
+		switch delivery {
+		case "file":
+			output := mcp.ExtractString(args, "output")
+			path, err := resolveOutputPath(output, "", "", "page", "pdf")
+			if err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(path, result.Data, 0644); err != nil {
+				return nil, fmt.Errorf("capture_pdf write file: %w", err)
+			}
+			resource := mcp.BlobResourceContents{
+				URI:      toFileURI(path),
+				MIMEType: result.MimeType,
+				Blob:     payload,
+			}
+			text := fmt.Sprintf("%s Saved to %s.", caption, path)
+			log.Printf("[MCP] TOOL capture_pdf RESULT saved=%s bytes=%d", path, len(result.Data))
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.TextContent{Type: "text", Text: text},
+					mcp.EmbeddedResource{Type: "resource", Resource: resource},
+				},
+			}, nil
+		default:
+			resource := mcp.BlobResourceContents{
+				URI:      "inline:pdf",
+				MIMEType: result.MimeType,
+				Blob:     payload,
+			}
+			log.Printf("[MCP] TOOL capture_pdf RESULT inline bytes=%d", len(result.Data))
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.TextContent{Type: "text", Text: caption},
+					mcp.EmbeddedResource{Type: "resource", Resource: resource},
+				},
+			}, nil
+		}
+	})
 }
