@@ -3,7 +3,10 @@ package cmd
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"net"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -153,6 +156,14 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 		historyLen := len(s.history)
 		resp, err := s.provider.CreateMessage(ctx, "", s.history, s.tools)
 		if err != nil {
+			if isTimeoutError(err) {
+				logAI("llm iteration %d: request timeout: %v", i+1, err)
+				if len(s.history) > 0 && s.history[len(s.history)-1] == userMsg {
+					s.history = s.history[:len(s.history)-1]
+				}
+				s.prune()
+				return "Timed out waiting for the model (90s). Please retry or simplify the request.", nil
+			}
 			return "", err
 		}
 		promptTokens, completionTokens := resp.GetUsage()
@@ -477,6 +488,28 @@ func formatTokenCount(n int) string {
 		return "?"
 	}
 	return strconv.Itoa(n)
+}
+
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	var urlErr *neturl.Error
+	if errors.As(err, &urlErr) {
+		if urlErr.Timeout() {
+			return true
+		}
+		return isTimeoutError(urlErr.Err)
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline exceeded")
 }
 
 func toolResultPayload(res aitools.Result) interface{} {
