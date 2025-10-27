@@ -14,7 +14,7 @@
 - Global CLI structure lives in `cmd/`; register the new `ai` command (alias `chat`) from `cmd/root.go`.
 - Tool implementations live alongside MCP server helpers; refactor shared logic without breaking existing server behavior or MCP stdio mode.
 - Conversation state stays in-memory for now; design `ChatSession` to optionally serialize in future.
-- Profiles likely belong in a per-user config file under `~/.roderik/ai-profiles.json` (exact path TBD) with overrides via flags/env vars.
+- Profiles now live in `~/.roderik/ai-profiles.json`; ship a starter template in `docs/ai-profiles.example.json` and document the setup flow so users can copy it into place.
 - Existing CLI uses `--profile` to pick the Chrome `user_data/` directory; AI chat will rely on a separate model-profile flag (`--model` / `-m`) for LLM configuration to avoid collisions.
 - Respect existing logging/verbosity flags; ensure new command integrates with Cobra pattern and uses stderr for logs.
 - Network access is required for OpenAI APIs—honor environment variables for keys; provide a mock/local provider hook for tests.
@@ -35,8 +35,8 @@
   5. For each tool call returned, invoke dispatcher, append tool result messages, re-call LLM if needed until assistant text response is ready.
   6. Stream/print assistant text; loop until exit (`/quit`, EOF).
 - **Config Surface (MVP):** 
-  - Flags: `--model` (`-m`), `--history-window`, maybe `--system-prompt` (model profile selection avoids clashing with the existing `--profile` flag that controls `user_data/`).
-  - Credentials & model: rely on `OPENAI_API_KEY` (env var) and default to `gpt-5-codex` for initial release.
+  - Flags: `--model` (`-m`) and `--history-window`; consider `--system-prompt` later if profiles need runtime overrides.
+  - Credentials & model: default model profile pulls from `~/.roderik/ai-profiles.json` with env-variable overrides (`OPENAI_API_KEY`, `OPENAI_API_BASE`, `RODERIK_AI_MODEL`, etc.); ships with `gpt-5` default when unset.
 - Future enhancement: reintroduce `$HOME/.roderik/config.toml` profiles once core chat loop is stable.
 
 ## Latest Status – October 27, 2025
@@ -52,6 +52,9 @@
 - `./cache-and-test.sh` passes, confirming the new command wires cleanly into existing tests and Windows cross-build.
 - Inline `<tool_call>` markup from non-OpenAI models is now parsed into structured tool invocations so GLM-style models don't stall after emitting XML-ish text.
 - When the loop hits the tool-iteration ceiling, we surface a user-facing fallback message summarizing the last tool result instead of crashing out of the REPL.
+- Model profiles load from JSON (`~/.roderik/ai-profiles.json`) with precedence `--model` flag → `RODERIK_AI_MODEL_PROFILE` → config default, and a tracked `docs/ai-profiles.example.json` bootstraps local setup alongside docs/ai-profiles.md.
+- Inline or env-sourced API keys are supported (`api_key` wins over `api_key_env` / `OPENAI_API_KEY`); tests cover both flows.
+- AI activity logs now mirror a human operator workflow (e.g., `AI ▶ duck query="…"`, `✔ duck → …`) while detailed iteration metrics remain behind `--verbose`.
 
 ## System Prompt Outline
 - **Static preamble:** brief description of Roderik’s purpose and workflow, lifted/adapted from existing MCP tool descriptions so the chat view aligns with MCP client expectations (emphasize browsing automation, careful navigation, safety).
@@ -73,7 +76,7 @@
    - Introduce new internal packages for history management, profile handling, provider abstraction, and context building—reusing `kai/pkg/history` & `kai/pkg/llm` (copy or move to shared module while avoiding module import cycles).
    - Define `ai` package types: `Profile`, `ProfileManager`, `ChatSession`, `ContextBuilder` to encapsulate config/history/tool invocation/system prompt assembly.
 4. **Profile Configuration**
-   - Load from `$HOME/.roderik/ai-profiles.json`; seed from `docs/ai-profiles.example.json` if absent and add gitignore guidance.
+   - Load from `$HOME/.roderik/ai-profiles.json`; seed from `docs/ai-profiles.example.json` if absent and add gitignore guidance (done).
    - Implement loader with precedence: CLI flag (`--model` / `-m`) → env override → config default.
    - Validate required fields (`provider`, `model`, and either `api_key` or `api_key_env`); allow optional `system_prompt` and `max_tokens`.
    - Add command `roderik ai profiles list` (optional, nice-to-have) or at least helpful errors.
@@ -129,8 +132,10 @@
 - ✅ Dynamic system prompt breadth: provide a concise context summary (URL + key element info + brief text) to stay mindful of token usage.
 - ✅ Streaming output expectations: stream tokens; reuse Kai’s line-buffered word-wrap behavior so we flush full lines only.
 - ✅ Session persistence commands: defer `/save`/`/load` until needed.
+- ⚠️ Tool iteration heuristics: still need smarter detection (e.g., repeated zero-result selectors) to avoid hitting the fallback response.
 
 ## Risks & Mitigations
+- **Operator visibility gaps**: current `[AI]` log lines are tuned for debugging (tool args/results). Provide a user-focused activity summary channel before promoting to broader testing.
 - **Complex refactor of MCP tool definitions**: ensure incremental change, first add shared layer then adapt existing command with tests.
 - **API credential handling**: rely on env vars (e.g., `OPENAI_API_KEY`) by default; document setup and warn against committing secrets when profile config returns.
 - **Function-call mismatch**: validate tool schema, add integration test that runs end-to-end tool call using mock provider to prevent regressions.
@@ -138,6 +143,7 @@
 - **Dynamic prompt drift**: ensure session context snapshot stays fresh (especially after navigation) by subscribing to existing event hooks rather than polling.
 - **Context completeness**: limit prompt metadata to URL/title, session flags, focused element summary, and last action to avoid bloat.
 - **Instruction duplication**: keep system prompt guidance unique; rely on per-tool descriptions for detailed usage to avoid redundant tokens.
+- **Iteration fallback complacency**: the new safety message prevents REPL crashes but may mask navigation loops; add heuristics or telemetry to detect repeated failing selectors.
 
 
 ## Work In Progress (Paused)

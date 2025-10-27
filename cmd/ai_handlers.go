@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -21,6 +20,10 @@ import (
 )
 
 var registerHandlersOnce sync.Once
+
+func toolDebug(format string, args ...interface{}) {
+	debugAI(format, args...)
+}
 
 func init() {
 	registerHandlers()
@@ -66,7 +69,7 @@ func loadURLHandler(ctx context.Context, args map[string]interface{}) (aitools.R
 		return aitools.Result{}, fmt.Errorf("load_url: url argument is required")
 	}
 
-	log.Printf("[TOOLS] load_url CALLED args=%#v", args)
+	toolDebug("[TOOLS] load_url CALLED args=%#v", args)
 
 	res, err := withPage(func() (aitools.Result, error) {
 		page, err := LoadURL(url)
@@ -85,12 +88,12 @@ func loadURLHandler(ctx context.Context, args map[string]interface{}) (aitools.R
 		return aitools.Result{}, err
 	}
 
-	log.Printf("[TOOLS] load_url RESULT: %q", res.Text)
+	toolDebug("[TOOLS] load_url RESULT: %q", res.Text)
 	return res, nil
 }
 
 func textHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] text CALLED args=%#v", args)
+	toolDebug("[TOOLS] text CALLED args=%#v", args)
 
 	var lengthPtr *int
 	if args != nil {
@@ -112,12 +115,12 @@ func textHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 		return aitools.Result{}, err
 	}
 
-	log.Printf("[TOOLS] text RESULT length=%d", len(res.Text))
+	toolDebug("[TOOLS] text RESULT length=%d", len(res.Text))
 	return res, nil
 }
 
 func getHTMLHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] get_html CALLED args=%#v", args)
+	toolDebug("[TOOLS] get_html CALLED args=%#v", args)
 
 	res, err := withPage(func() (aitools.Result, error) {
 		var rawURL string
@@ -147,7 +150,7 @@ func getHTMLHandler(ctx context.Context, args map[string]interface{}) (aitools.R
 				if err != nil {
 					return aitools.Result{}, fmt.Errorf("get_html decode error: %w", err)
 				}
-				log.Printf("[TOOLS] get_html non-HTML (%s) returning %d bytes", ctype, len(text))
+				toolDebug("[TOOLS] get_html non-HTML (%s) returning %d bytes", ctype, len(text))
 				return aitools.Result{Text: text}, nil
 			}
 
@@ -175,12 +178,12 @@ func getHTMLHandler(ctx context.Context, args map[string]interface{}) (aitools.R
 		return aitools.Result{}, err
 	}
 
-	log.Printf("[TOOLS] get_html RESULT length=%d", len(res.Text))
+	toolDebug("[TOOLS] get_html RESULT length=%d", len(res.Text))
 	return res, nil
 }
 
 func captureScreenshotHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] capture_screenshot CALLED args=%#v", args)
+	toolDebug("[TOOLS] capture_screenshot CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		rawURL := mcp.ExtractString(args, "url")
@@ -259,7 +262,7 @@ func captureScreenshotHandler(ctx context.Context, args map[string]interface{}) 
 			if err := os.WriteFile(path, result.Data, 0644); err != nil {
 				return aitools.Result{}, fmt.Errorf("capture_screenshot write file: %w", err)
 			}
-			log.Printf("[TOOLS] capture_screenshot RESULT saved=%s bytes=%d", path, len(result.Data))
+			toolDebug("[TOOLS] capture_screenshot RESULT saved=%s bytes=%d", path, len(result.Data))
 			return aitools.Result{
 				Text:        fmt.Sprintf("%s Saved to %s.", caption, path),
 				Binary:      result.Data,
@@ -267,7 +270,7 @@ func captureScreenshotHandler(ctx context.Context, args map[string]interface{}) 
 				FilePath:    path,
 			}, nil
 		default:
-			log.Printf("[TOOLS] capture_screenshot RESULT inline bytes=%d", len(result.Data))
+			toolDebug("[TOOLS] capture_screenshot RESULT inline bytes=%d", len(result.Data))
 			return aitools.Result{
 				Text:        caption,
 				Binary:      result.Data,
@@ -278,7 +281,7 @@ func captureScreenshotHandler(ctx context.Context, args map[string]interface{}) 
 }
 
 func capturePDFHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] capture_pdf CALLED args=%#v", args)
+	toolDebug("[TOOLS] capture_pdf CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		rawURL := mcp.ExtractString(args, "url")
@@ -360,7 +363,7 @@ func capturePDFHandler(ctx context.Context, args map[string]interface{}) (aitool
 			if err := os.WriteFile(path, result.Data, 0644); err != nil {
 				return aitools.Result{}, fmt.Errorf("capture_pdf write file: %w", err)
 			}
-			log.Printf("[TOOLS] capture_pdf RESULT saved=%s bytes=%d", path, len(result.Data))
+			toolDebug("[TOOLS] capture_pdf RESULT saved=%s bytes=%d", path, len(result.Data))
 			return aitools.Result{
 				Text:        fmt.Sprintf("%s Saved to %s.", caption, path),
 				Binary:      result.Data,
@@ -368,7 +371,7 @@ func capturePDFHandler(ctx context.Context, args map[string]interface{}) (aitool
 				FilePath:    path,
 			}, nil
 		default:
-			log.Printf("[TOOLS] capture_pdf RESULT inline bytes=%d", len(result.Data))
+			toolDebug("[TOOLS] capture_pdf RESULT inline bytes=%d", len(result.Data))
 			return aitools.Result{
 				Text:        caption,
 				Binary:      result.Data,
@@ -380,7 +383,7 @@ func capturePDFHandler(ctx context.Context, args map[string]interface{}) (aitool
 }
 
 func toMarkdownHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] to_markdown CALLED args=%#v", args)
+	toolDebug("[TOOLS] to_markdown CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		var rawURL string
@@ -410,7 +413,7 @@ func toMarkdownHandler(ctx context.Context, args map[string]interface{}) (aitool
 				if err != nil {
 					return aitools.Result{}, fmt.Errorf("to_markdown decode error: %w", err)
 				}
-				log.Printf("[TOOLS] to_markdown non-HTML (%s) returning %d bytes", ctype, len(text))
+				toolDebug("[TOOLS] to_markdown non-HTML (%s) returning %d bytes", ctype, len(text))
 				return aitools.Result{Text: text}, nil
 			}
 
@@ -448,13 +451,13 @@ func toMarkdownHandler(ctx context.Context, args map[string]interface{}) (aitool
 		}
 
 		md := convertAXTreeToMarkdown(tree, Page)
-		log.Printf("[TOOLS] to_markdown RESULT length=%d", len(md))
+		toolDebug("[TOOLS] to_markdown RESULT length=%d", len(md))
 		return aitools.Result{Text: md}, nil
 	})
 }
 
 func runJSHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] run_js CALLED args=%#v", args)
+	toolDebug("[TOOLS] run_js CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		var showErrors bool
@@ -495,7 +498,7 @@ func runJSHandler(ctx context.Context, args map[string]interface{}) (aitools.Res
 			return aitools.Result{}, fmt.Errorf("run_js JSON marshal error: %w", err)
 		}
 
-		log.Printf("[TOOLS] run_js RESULT length=%d", len(resultJSON))
+		toolDebug("[TOOLS] run_js RESULT length=%d", len(resultJSON))
 		return aitools.Result{Text: string(resultJSON)}, nil
 	})
 }
@@ -517,7 +520,7 @@ func ensureDuckClient() duckduck.SearchClient {
 }
 
 func duckHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] duck CALLED args=%#v", args)
+	toolDebug("[TOOLS] duck CALLED args=%#v", args)
 
 	query := strings.TrimSpace(mcp.ExtractString(args, "query"))
 	if query == "" {
@@ -567,7 +570,7 @@ func duckHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 }
 
 func searchHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] search CALLED args=%#v", args)
+	toolDebug("[TOOLS] search CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		selector := strings.TrimSpace(mcp.ExtractString(args, "selector"))
@@ -583,7 +586,7 @@ func searchHandler(ctx context.Context, args map[string]interface{}) (aitools.Re
 }
 
 func headHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] head CALLED args=%#v", args)
+	toolDebug("[TOOLS] head CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		level := mcp.ExtractString(args, "level")
@@ -596,7 +599,7 @@ func headHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 }
 
 func nextHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] next CALLED args=%#v", args)
+	toolDebug("[TOOLS] next CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		var idxPtr *int
@@ -616,7 +619,7 @@ func nextHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 }
 
 func prevHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] prev CALLED args=%#v", args)
+	toolDebug("[TOOLS] prev CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		var idxPtr *int
@@ -636,7 +639,7 @@ func prevHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 }
 
 func elemHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] elem CALLED args=%#v", args)
+	toolDebug("[TOOLS] elem CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		selector := strings.TrimSpace(mcp.ExtractString(args, "selector"))
@@ -652,7 +655,7 @@ func elemHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 }
 
 func childHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] child CALLED")
+	toolDebug("[TOOLS] child CALLED")
 
 	return withPage(func() (aitools.Result, error) {
 		msg, err := mcpChild()
@@ -664,7 +667,7 @@ func childHandler(ctx context.Context, args map[string]interface{}) (aitools.Res
 }
 
 func parentHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] parent CALLED")
+	toolDebug("[TOOLS] parent CALLED")
 
 	return withPage(func() (aitools.Result, error) {
 		msg, err := mcpParent()
@@ -676,7 +679,7 @@ func parentHandler(ctx context.Context, args map[string]interface{}) (aitools.Re
 }
 
 func htmlHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] html CALLED")
+	toolDebug("[TOOLS] html CALLED")
 
 	return withPage(func() (aitools.Result, error) {
 		html, err := mcpHTML()
@@ -688,7 +691,7 @@ func htmlHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 }
 
 func clickHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] click CALLED")
+	toolDebug("[TOOLS] click CALLED")
 
 	return withPage(func() (aitools.Result, error) {
 		msg, err := mcpClick()
@@ -700,7 +703,7 @@ func clickHandler(ctx context.Context, args map[string]interface{}) (aitools.Res
 }
 
 func typeHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] type CALLED args=%#v", args)
+	toolDebug("[TOOLS] type CALLED args=%#v", args)
 
 	return withPage(func() (aitools.Result, error) {
 		text := strings.TrimSpace(mcp.ExtractString(args, "text"))
@@ -716,7 +719,7 @@ func typeHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 }
 
 func boxHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] box CALLED")
+	toolDebug("[TOOLS] box CALLED")
 
 	return withPage(func() (aitools.Result, error) {
 		msg, err := mcpBox()
@@ -728,7 +731,7 @@ func boxHandler(ctx context.Context, args map[string]interface{}) (aitools.Resul
 }
 
 func computedStylesHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] computedstyles CALLED")
+	toolDebug("[TOOLS] computedstyles CALLED")
 
 	return withPage(func() (aitools.Result, error) {
 		msg, err := mcpComputedStyles()
@@ -740,7 +743,7 @@ func computedStylesHandler(ctx context.Context, args map[string]interface{}) (ai
 }
 
 func describeHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] describe CALLED")
+	toolDebug("[TOOLS] describe CALLED")
 
 	return withPage(func() (aitools.Result, error) {
 		msg, err := mcpDescribe()
@@ -752,7 +755,7 @@ func describeHandler(ctx context.Context, args map[string]interface{}) (aitools.
 }
 
 func xpathHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
-	log.Printf("[TOOLS] xpath CALLED")
+	toolDebug("[TOOLS] xpath CALLED")
 
 	return withPage(func() (aitools.Result, error) {
 		msg, err := mcpXPath()

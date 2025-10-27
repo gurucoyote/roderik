@@ -9,6 +9,7 @@ import (
 	neturl "net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -147,7 +148,12 @@ func ensureChatSession() (*ChatSession, error) {
 		historyWindow:    aiHistoryWindow,
 		baseSystemPrompt: strings.TrimSpace(modelProfile.SystemPrompt),
 	}
-	logAI("session initialized (profile=%s provider=%s model=%s base_url=%s max_tokens=%d tools=%d history_window=%d)",
+	logAI("Ready with profile %s (%s via %s)",
+		profileNameOrDefault(modelProfile.Name),
+		modelProfile.Model,
+		providerName,
+	)
+	debugAI("session initialized profile=%s provider=%s model=%s base_url=%s max_tokens=%d tools=%d history_window=%d",
 		profileNameOrDefault(modelProfile.Name),
 		providerName,
 		modelProfile.Model,
@@ -186,7 +192,7 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 		resp, err := s.provider.CreateMessage(ctx, "", s.history, s.tools)
 		if err != nil {
 			if isTimeoutError(err) {
-				logAI("llm iteration %d: request timeout: %v", i+1, err)
+				debugAI("llm iteration %d timeout: %v", i+1, err)
 				if len(s.history) > 0 && s.history[len(s.history)-1] == userMsg {
 					s.history = s.history[:len(s.history)-1]
 				}
@@ -196,7 +202,7 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 			return "", err
 		}
 		promptTokens, completionTokens := resp.GetUsage()
-		logAI(
+		debugAI(
 			"llm iteration %d: history=%d tools=%d prompt_tokens=%s completion_tokens=%s",
 			i+1,
 			historyLen,
@@ -213,35 +219,39 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 		toolCalls := resp.GetToolCalls()
 		if len(toolCalls) == 0 {
 			if inline := synthesizeInlineToolCalls(resp.GetContent()); len(inline) > 0 {
-				logAI("detected inline tool call markup; synthesizing %d tool call(s)", len(inline))
+				debugAI("detected inline tool call markup count=%d", len(inline))
 				toolCalls = inline
 			}
 		}
 		if len(toolCalls) == 0 {
-			final := truncateForLog(resp.GetContent(), 512)
-			logAI("assistant response (iteration %d): %s", i+1, final)
+			debugAI("assistant response iteration=%d", i+1)
 			return resp.GetContent(), nil
 		}
 
-		logAI("assistant requested %d tool call(s)", len(toolCalls))
+		debugAI("assistant requested %d tool call(s)", len(toolCalls))
 		for _, call := range toolCalls {
 			sanitized := call.GetName()
 			def, ok := s.toolRegistry[sanitized]
 			var resultContent interface{}
 			var callErr error
+			argsLabel := formatToolArgs(call.GetArguments())
 			if !ok {
 				callErr = fmt.Errorf("tool %q is not registered", sanitized)
-				logAI("tool call skipped: %s (unknown sanitized name)", sanitized)
+				logAI("✖ unable to use %s: tool not registered", sanitized)
 			} else {
-				logAI("tool call start: %s (sanitized=%s)", def.Name, sanitized)
+				if argsLabel != "" {
+					logAI("▶ %s %s", def.Name, argsLabel)
+				} else {
+					logAI("▶ %s", def.Name)
+				}
 				result, err := aitools.Call(ctx, def.Name, call.GetArguments())
 				if err != nil {
 					callErr = err
-					logAI("tool call error: %s %v", def.Name, err)
+					logAI("✖ %s → %v", def.Name, err)
 				} else {
 					resultContent = toolResultPayload(result)
 					lastToolSummary = summarizeToolResult(result)
-					logAI("tool call success: %s result=%s", def.Name, truncateForLog(lastToolSummary, 512))
+					logAI("✔ %s → %s", def.Name, truncateForLog(lastToolSummary, 256))
 				}
 			}
 
@@ -263,7 +273,7 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 		}
 	}
 
-	logAI("assistant hit tool iteration limit; returning fallback message")
+	debugAI("assistant hit tool iteration limit; returning fallback message")
 	if lastToolSummary != "" {
 		message := fmt.Sprintf("I ran multiple tools but still couldn't finish. Most recent result: %s", truncateForLog(lastToolSummary, 256))
 		return message, nil
@@ -272,7 +282,14 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 }
 
 func logAI(format string, a ...interface{}) {
-	fmt.Fprintf(os.Stderr, "[AI] "+format+"\n", a...)
+	fmt.Fprintf(os.Stderr, "AI ▶ "+format+"\n", a...)
+}
+
+func debugAI(format string, a ...interface{}) {
+	if !Verbose {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "[AI debug] "+format+"\n", a...)
 }
 
 func profileNameOrDefault(name string) string {
@@ -628,6 +645,30 @@ func formatTokenCount(n int) string {
 		return "?"
 	}
 	return strconv.Itoa(n)
+}
+
+func formatToolArgs(args map[string]interface{}) string {
+	if len(args) == 0 {
+		return ""
+	}
+
+	keys := make([]string, 0, len(args))
+	for k := range args {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		v := args[k]
+		text := truncateForLog(fmt.Sprint(v), 80)
+		if strings.ContainsAny(text, " \t\n\"") {
+			text = fmt.Sprintf("\"%s\"", text)
+		}
+		parts = append(parts, fmt.Sprintf("%s=%s", k, text))
+	}
+
+	return strings.Join(parts, " ")
 }
 
 func isTimeoutError(err error) bool {
