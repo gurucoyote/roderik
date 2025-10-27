@@ -40,7 +40,7 @@ var mcpCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(mcpCmd)
-	mcpCmd.Flags().StringVarP(&mcpLogPath, "log", "l", "roderik-mcp.log", "path to the MCP debug log file")
+	mcpCmd.Flags().StringVar(&mcpLogPath, "log", "roderik-mcp.log", "path to the MCP debug log file")
 
 	// ensure cobra’s own help/errors go to stderr
 	mcpCmd.SetOut(os.Stderr)
@@ -89,7 +89,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 	s := server.NewMCPServer(
 		"roderik",
 		"1.0.0",
-		server.WithToolCapabilities(false),
+		server.WithToolCapabilities(true),
 	)
 
 	if loadURLToolEnabled() {

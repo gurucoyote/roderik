@@ -45,6 +45,8 @@
 - Chat session maintains in-memory history with a configurable `--history-window`; stored messages/tool results are trimmed to keep token usage lean while preserving the latest tool-call context.
 - Chat loop now emits `[AI]` logs for each prompt, LLM iteration (with token counts), tool call, and tool result so operators can audit every step while watching stderr.
 - Added `--logfile` flag so sessions can tee stdout, stderr, and user keystrokes into `roderik.log` (or a custom path) without breaking interactive mode.
+- `roderik mcp` now advertises `tool_capabilities` support to connected MCP clients, letting the upcoming chat command invoke the shared tool registry without feature gating.
+- The MCP server `--log` flag no longer has a short `-l` alias so future AI chat logging options can reuse the short form without conflicts.
 - DuckDuckGo search tool is available for opt-in web lookups via the shared handler registry.
 - `./cache-and-test.sh` passes, confirming the new command wires cleanly into existing tests and Windows cross-build.
 
