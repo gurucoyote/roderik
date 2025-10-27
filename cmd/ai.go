@@ -57,12 +57,14 @@ func init() {
 }
 
 type ChatSession struct {
-	provider         llm.Provider
-	tools            []llm.Tool
-	toolRegistry     map[string]aitools.Definition
-	history          []llm.Message
-	historyWindow    int
-	baseSystemPrompt string
+	provider              llm.Provider
+	tools                 []llm.Tool
+	toolRegistry          map[string]aitools.Definition
+	history               []llm.Message
+	historyWindow         int
+	baseSystemPrompt      string
+	totalPromptTokens     int64
+	totalCompletionTokens int64
 }
 
 func runAICommand(cmd *cobra.Command, args []string) error {
@@ -182,6 +184,9 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 
 	const maxIterations = 8
 	var lastToolSummary string
+	turnSteps := make([]string, 0, 8)
+	turnPromptTokens := 0
+	turnCompletionTokens := 0
 	for i := 0; i < maxIterations; i++ {
 		fullPrompt := buildSystemPrompt(s.tools)
 		if s.baseSystemPrompt != "" {
@@ -202,6 +207,10 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 			return "", err
 		}
 		promptTokens, completionTokens := resp.GetUsage()
+		s.totalPromptTokens += int64(promptTokens)
+		s.totalCompletionTokens += int64(completionTokens)
+		turnPromptTokens += promptTokens
+		turnCompletionTokens += completionTokens
 		debugAI(
 			"llm iteration %d: history=%d tools=%d prompt_tokens=%s completion_tokens=%s",
 			i+1,
@@ -225,6 +234,7 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 		}
 		if len(toolCalls) == 0 {
 			debugAI("assistant response iteration=%d", i+1)
+			logTurnSummary(turnSteps, turnPromptTokens, turnCompletionTokens, s.totalPromptTokens, s.totalCompletionTokens)
 			return resp.GetContent(), nil
 		}
 
@@ -234,11 +244,15 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 			def, ok := s.toolRegistry[sanitized]
 			var resultContent interface{}
 			var callErr error
+			stepLabel := sanitized
+			stepSummary := ""
 			argsLabel := formatToolArgs(call.GetArguments())
 			if !ok {
 				callErr = fmt.Errorf("tool %q is not registered", sanitized)
+				stepSummary = "tool not registered"
 				logAI("✖ unable to use %s: tool not registered", sanitized)
 			} else {
+				stepLabel = def.Name
 				if argsLabel != "" {
 					logAI("▶ %s %s", def.Name, argsLabel)
 				} else {
@@ -247,11 +261,12 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 				result, err := aitools.Call(ctx, def.Name, call.GetArguments())
 				if err != nil {
 					callErr = err
+					stepSummary = err.Error()
 					logAI("✖ %s → %v", def.Name, err)
 				} else {
 					resultContent = toolResultPayload(result)
-					lastToolSummary = summarizeToolResult(result)
-					logAI("✔ %s → %s", def.Name, truncateForLog(lastToolSummary, 256))
+					stepSummary = summarizeToolResult(result)
+					logAI("✔ %s → %s", def.Name, truncateForLog(stepSummary, 256))
 				}
 			}
 
@@ -259,7 +274,15 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 				resultContent = map[string]interface{}{
 					"error": callErr.Error(),
 				}
-				lastToolSummary = callErr.Error()
+				errMsg := truncateForLog(stepSummary, 80)
+				turnSteps = append(turnSteps, fmt.Sprintf("%s (error: %s)", stepLabel, errMsg))
+				lastToolSummary = errMsg
+			} else if stepSummary != "" {
+				turnSteps = append(turnSteps, summarizeStep(stepLabel, stepSummary))
+				lastToolSummary = stepSummary
+			} else {
+				turnSteps = append(turnSteps, stepLabel)
+				lastToolSummary = stepLabel
 			}
 
 			toolMsg, err := s.provider.CreateToolResponse(call.GetID(), resultContent)
@@ -274,6 +297,7 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 	}
 
 	debugAI("assistant hit tool iteration limit; returning fallback message")
+	logTurnSummary(turnSteps, turnPromptTokens, turnCompletionTokens, s.totalPromptTokens, s.totalCompletionTokens)
 	if lastToolSummary != "" {
 		message := fmt.Sprintf("I ran multiple tools but still couldn't finish. Most recent result: %s", truncateForLog(lastToolSummary, 256))
 		return message, nil
@@ -638,6 +662,62 @@ func sanitizeHistory(messages []llm.Message) []llm.Message {
 		appendMessage(msg)
 	}
 	return clean
+}
+
+func logTurnSummary(steps []string, turnPrompt, turnCompletion int, totalPrompt, totalCompletion int64) {
+	summary := "no tools used"
+	if len(steps) > 0 {
+		summary = strings.Join(steps, " → ")
+	}
+
+	turnPromptHuman := formatTokensHuman(int64(turnPrompt))
+	turnCompletionHuman := formatTokensHuman(int64(turnCompletion))
+	totalHuman := formatTokensHuman(totalPrompt + totalCompletion)
+
+	logAI("Summary: %s | tokens this turn %s prompt / %s completion (total %s)",
+		summary,
+		turnPromptHuman,
+		turnCompletionHuman,
+		totalHuman,
+	)
+}
+
+func summarizeStep(name, detail string) string {
+	detail = strings.TrimSpace(detail)
+	if detail == "" {
+		return name
+	}
+	detail = truncateForLog(detail, 80)
+	return fmt.Sprintf("%s → %s", name, detail)
+}
+
+func formatTokensHuman(n int64) string {
+	if n <= 0 {
+		return "0"
+	}
+
+	type unit struct {
+		value float64
+		label string
+	}
+
+	thresholds := []unit{
+		{1_000_000_000, "B"},
+		{1_000_000, "M"},
+		{1_000, "k"},
+	}
+
+	for _, t := range thresholds {
+		if float64(n) >= t.value {
+			scaled := float64(n) / t.value
+			if scaled >= 100 || scaled == float64(int64(scaled)) {
+				return fmt.Sprintf("%d%s", int64(scaled+0.5), t.label)
+			}
+			return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.1f%s", scaled, t.label), "0"), ".")
+		}
+	}
+
+	return strconv.FormatInt(n, 10)
 }
 
 func formatTokenCount(n int) string {

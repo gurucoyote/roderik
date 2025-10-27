@@ -55,6 +55,7 @@
 - Model profiles load from JSON (`~/.roderik/ai-profiles.json`) with precedence `--model` flag → `RODERIK_AI_MODEL_PROFILE` → config default, and a tracked `docs/ai-profiles.example.json` bootstraps local setup alongside docs/ai-profiles.md.
 - Inline or env-sourced API keys are supported (`api_key` wins over `api_key_env` / `OPENAI_API_KEY`); tests cover both flows.
 - AI activity logs now mirror a human operator workflow (e.g., `AI ▶ duck query="…"`, `✔ duck → …`) while detailed iteration metrics remain behind `--verbose`.
+- Each turn now ends with a concise summary of the tool chain plus running prompt/completion token totals (e.g., `tokens this turn 3.5k / 0.6k, total 128k`).
 
 ## System Prompt Outline
 - **Static preamble:** brief description of Roderik’s purpose and workflow, lifted/adapted from existing MCP tool descriptions so the chat view aligns with MCP client expectations (emphasize browsing automation, careful navigation, safety).
