@@ -2,9 +2,14 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -12,23 +17,21 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
-	"bytes"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/go-rod/stealth"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"io/ioutil"
-	"net/http"
-	"time"
 )
 
 func GetUserInput(prompt string) string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Fprint(os.Stderr, prompt)
 	text, _ := reader.ReadString('\n')
+	LogUserInput(text)
 	return text
 }
 
@@ -41,11 +44,91 @@ func AskForConfirmation(prompt string) bool {
 	return false
 }
 
-var ShowNetActivity bool
-var Interactive bool
-var Verbose bool
-var Stealth bool          // Enable stealth mode
-var IgnoreCertErrors bool // New flag for ignoring certificate errors
+var (
+	ShowNetActivity  bool
+	Interactive      bool
+	Verbose          bool
+	Stealth          bool // Enable stealth mode
+	IgnoreCertErrors bool // New flag for ignoring certificate errors
+
+	logFilePath    string
+	logFile        *os.File
+	logSetupOnce   sync.Once
+	logSetupErr    error
+	logPipeWriters []*os.File
+)
+
+var (
+	originalStdout = os.Stdout
+	originalStderr = os.Stderr
+)
+
+func LogUserInput(input string) {
+	if logFile == nil {
+		return
+	}
+	trimmed := strings.TrimRight(input, "\r\n")
+	if trimmed == "" {
+		trimmed = "(empty)"
+	}
+	timestamp := time.Now().Format(time.RFC3339)
+	fmt.Fprintf(logFile, "[INPUT %s] %s\n", timestamp, trimmed)
+	_ = logFile.Sync()
+}
+
+func ensureLoggingSetup() error {
+	logSetupOnce.Do(func() {
+		path := strings.TrimSpace(logFilePath)
+		if path == "" {
+			return
+		}
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			logSetupErr = fmt.Errorf("open log file %q: %w", path, err)
+			return
+		}
+		logFile = f
+		if err := teeStream(&os.Stdout, originalStdout, f); err != nil {
+			logSetupErr = fmt.Errorf("redirect stdout: %w", err)
+			return
+		}
+		if err := teeStream(&os.Stderr, originalStderr, f); err != nil {
+			logSetupErr = fmt.Errorf("redirect stderr: %w", err)
+			return
+		}
+		log.SetOutput(io.MultiWriter(originalStderr, f))
+	})
+	return logSetupErr
+}
+
+func teeStream(target **os.File, original *os.File, logDest *os.File) error {
+	r, w, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	*target = w
+	mw := io.MultiWriter(original, logDest)
+	go func() {
+		_, _ = io.Copy(mw, r)
+	}()
+	logPipeWriters = append(logPipeWriters, w)
+	return nil
+}
+
+func isTerminalFile(f *os.File) bool {
+	if f == nil {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
+}
+
+func StdoutIsTerminal() bool {
+	return isTerminalFile(originalStdout)
+}
+
+func StdinIsTerminal() bool {
+	return isTerminalFile(os.Stdin)
+}
 
 type EventLog struct {
 	mu   sync.Mutex
@@ -220,6 +303,12 @@ var RootCmd = &cobra.Command{
 	Args:  cobra.ArbitraryArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		args = extractTargetFromProfileFlag(cmd, args)
+		if err := ensureLoggingSetup(); err != nil {
+			browserInitErr = err
+			Page = nil
+			Browser = nil
+			return
+		}
 		if Desktop {
 			logFn := func(format string, a ...interface{}) {
 				if Verbose {
@@ -297,7 +386,7 @@ var RootCmd = &cobra.Command{
 				Interactive = value
 			}
 		} else {
-			Interactive = term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+			Interactive = isTerminalFile(os.Stdin) && isTerminalFile(originalStdout)
 		}
 
 		targetURL := args[0]
@@ -790,6 +879,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&IgnoreCertErrors, "ignore-cert-errors", "k", false, "Ignore certificate errors") // Register the new flag
 	RootCmd.PersistentFlags().BoolVarP(&Stealth, "stealth", "s", false, "Enable stealth mode")
 	RootCmd.PersistentFlags().BoolVarP(&Desktop, "desktop", "d", false, "Attach to Windows desktop Chrome (WSL2 only)")
+	RootCmd.PersistentFlags().StringVarP(&logFilePath, "logfile", "l", "", "Append stdout, stderr, and user input to the specified log file")
 	RootCmd.PersistentFlags().StringVar(&profileFlag, "profile", "", "Chrome profile directory to use (omit to pick interactively)")
 	RootCmd.PersistentFlags().StringVar(&profileTitleFlag, "profile-title", "", "Override the friendly window title for the selected profile")
 	if pf := RootCmd.PersistentFlags().Lookup("profile"); pf != nil {

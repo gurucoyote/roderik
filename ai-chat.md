@@ -44,6 +44,7 @@
 - System prompt builder is in place with browser URL/title capture and tool listings; focused-element details are still coarse (“element selected”) and should be expanded to include richer attributes later.
 - Chat session maintains in-memory history with a configurable `--history-window`; additional persistence/profiles remain TODO.
 - Chat loop now emits `[AI]` logs for each prompt, LLM iteration, tool call, and tool result so operators can audit every step while watching stderr.
+- Added `--logfile` flag so sessions can tee stdout, stderr, and user keystrokes into `roderik.log` (or a custom path) without breaking interactive mode.
 - `./cache-and-test.sh` passes, confirming the new command wires cleanly into existing tests and Windows cross-build.
 
 ## System Prompt Outline

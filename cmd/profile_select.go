@@ -13,7 +13,6 @@ import (
 	"unicode"
 
 	survey "github.com/AlecAivazis/survey/v2"
-	"golang.org/x/term"
 )
 
 type profileOption struct {
@@ -91,7 +90,7 @@ func ensureDesktopProfileSelection(logf func(string, ...interface{})) error {
 			selected.Friendly = dirName
 		}
 	} else {
-		shouldPrompt := term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+		shouldPrompt := isTerminalFile(os.Stdin) && isTerminalFile(originalStdout)
 		if shouldPrompt {
 			selected, created, err = promptForProfile(options, fsRoot, defaultDir, friendlyNames)
 			if err != nil {
