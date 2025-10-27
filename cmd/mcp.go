@@ -7,17 +7,15 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
-	"roderik/browser"
+	aitools "roderik/internal/ai/tools"
 )
 
 // path to the MCP debug log file, override with --log
@@ -102,23 +100,17 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithString("url", mcp.Required(), mcp.Description("the URL of the webpage to load")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					log.Printf("[MCP] TOOL load_url CALLED args=%#v", req.Params.Arguments)
-					url, _ := req.Params.Arguments["url"].(string)
-					page, err := LoadURL(url)
-					if err != nil {
-						return nil, fmt.Errorf("load_url failed: %w", err)
-					}
-					body, err := page.Element("body")
-					if err != nil {
-						return nil, fmt.Errorf("load_url failed to select <body>: %w", err)
-					}
-					CurrentElement = body
-					msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
-					result := mcp.NewToolResultText(msg)
-					log.Printf("[MCP] TOOL load_url RESULT: %q", msg)
-					return result, nil
-				})
+				log.Printf("[MCP] TOOL load_url CALLED args=%#v", req.Params.Arguments)
+				res, err := aitools.Call(ctx, "load_url", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				out, err := resultToMCP(res)
+				if err != nil {
+					return nil, err
+				}
+				log.Printf("[MCP] TOOL load_url RESULT: %q", res.Text)
+				return out, nil
 			},
 		)
 	}
@@ -137,55 +129,17 @@ func runMCP(cmd *cobra.Command, args []string) {
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL get_html CALLED args=%#v", req.Params.Arguments)
-				if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
-					// First probe the resource – if it's not HTML we simply return its raw body.
-					buf, ctype, looksHTML, err := probeURL(raw, 32*1024)
-					if err != nil {
-						return nil, fmt.Errorf("get_html probe error: %w", err)
-					}
-					if !looksHTML {
-						data := buf
-						if len(data) == 0 {
-							resp, err := http.Get(raw)
-							if err != nil {
-								return nil, fmt.Errorf("get_html fetch error: %w", err)
-							}
-							defer resp.Body.Close()
-							data, _ = io.ReadAll(resp.Body)
-							ctype = resp.Header.Get("Content-Type")
-						}
-						text, err := decodeToUTF8(data, ctype)
-						if err != nil {
-							return nil, fmt.Errorf("get_html decode error: %w", err)
-						}
-						log.Printf("[MCP] TOOL get_html non-HTML (%s) returning %d bytes", ctype, len(text))
-						return mcp.NewToolResultText(text), nil
-					}
-
-					// HTML → load with browser so we can access <html> element.
-					page, err := LoadURL(raw)
-					if err != nil {
-						return nil, fmt.Errorf("get_html failed to load url %q: %w", raw, err)
-					}
-					el, err := page.Element("html")
-					if err != nil {
-						return nil, fmt.Errorf("get_html failed to select <html>: %w", err)
-					}
-					CurrentElement = el
-				}
-				if CurrentElement == nil {
-					return nil, fmt.Errorf("no page loaded – call load_url first or provide url")
-				}
-				html, err := CurrentElement.HTML()
-				if err != nil {
-					return nil, fmt.Errorf("get_html failed to get HTML: %w", err)
-				}
-				result := mcp.NewToolResultText(html)
-				log.Printf("[MCP] TOOL get_html RESULT length=%d", len(html))
-				return result, nil
-			})
+			log.Printf("[MCP] TOOL get_html CALLED args=%#v", req.Params.Arguments)
+			res, err := aitools.Call(ctx, "get_html", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			out, err := resultToMCP(res)
+			if err != nil {
+				return nil, err
+			}
+			log.Printf("[MCP] TOOL get_html RESULT length=%d", len(res.Text))
+			return out, nil
 		},
 	)
 
@@ -196,20 +150,17 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithNumber("length", mcp.Description("optional maximum number of characters to return")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL text CALLED args=%#v", req.Params.Arguments)
-				var lengthPtr *int
-				if v, ok := req.Params.Arguments["length"].(float64); ok {
-					l := int(v)
-					lengthPtr = &l
-				}
-				text, err := mcpText(lengthPtr)
-				if err != nil {
-					return nil, err
-				}
-				log.Printf("[MCP] TOOL text RESULT length=%d", len(text))
-				return mcp.NewToolResultText(text), nil
-			})
+			log.Printf("[MCP] TOOL text CALLED args=%#v", req.Params.Arguments)
+			res, err := aitools.Call(ctx, "text", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			out, err := resultToMCP(res)
+			if err != nil {
+				return nil, err
+			}
+			log.Printf("[MCP] TOOL text RESULT length=%d", len(res.Text))
+			return out, nil
 		},
 	)
 
@@ -228,7 +179,11 @@ func runMCP(cmd *cobra.Command, args []string) {
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			log.Printf("[MCP] TOOL capture_screenshot CALLED args=%#v", req.Params.Arguments)
-			return mcpHandleCaptureScreenshot(req.Params.Arguments)
+			res, err := aitools.Call(ctx, "capture_screenshot", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 
@@ -258,7 +213,11 @@ func runMCP(cmd *cobra.Command, args []string) {
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			log.Printf("[MCP] TOOL capture_pdf CALLED args=%#v", req.Params.Arguments)
-			return mcpHandleCapturePDF(req.Params.Arguments)
+			res, err := aitools.Call(ctx, "capture_pdf", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 
@@ -268,15 +227,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithDescription("Get the bounding box of the current element."),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL box CALLED")
-				msg, err := mcpBox()
-				if err != nil {
-					return nil, err
-				}
-				log.Printf("[MCP] TOOL box RESULT length=%d", len(msg))
-				return mcp.NewToolResultText(msg), nil
-			})
+			log.Printf("[MCP] TOOL box CALLED")
+			res, err := aitools.Call(ctx, "box", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 
@@ -286,15 +242,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithDescription("Output the computed styles of the current element in JSON format."),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL computedstyles CALLED")
-				msg, err := mcpComputedStyles()
-				if err != nil {
-					return nil, err
-				}
-				log.Printf("[MCP] TOOL computedstyles RESULT length=%d", len(msg))
-				return mcp.NewToolResultText(msg), nil
-			})
+			log.Printf("[MCP] TOOL computedstyles CALLED")
+			res, err := aitools.Call(ctx, "computedstyles", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 
@@ -304,15 +257,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithDescription("Describe the current element as formatted JSON."),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL describe CALLED")
-				desc, err := mcpDescribe()
-				if err != nil {
-					return nil, err
-				}
-				log.Printf("[MCP] TOOL describe RESULT length=%d", len(desc))
-				return mcp.NewToolResultText(desc), nil
-			})
+			log.Printf("[MCP] TOOL describe CALLED")
+			res, err := aitools.Call(ctx, "describe", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 
@@ -322,15 +272,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithDescription("Get the optimized XPath of the current element."),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL xpath CALLED")
-				xpath, err := mcpXPath()
-				if err != nil {
-					return nil, err
-				}
-				log.Printf("[MCP] TOOL xpath RESULT length=%d", len(xpath))
-				return mcp.NewToolResultText(xpath), nil
-			})
+			log.Printf("[MCP] TOOL xpath CALLED")
+			res, err := aitools.Call(ctx, "xpath", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 
@@ -392,67 +339,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL to_markdown CALLED args=%#v", req.Params.Arguments)
-				// if a URL was passed in, handle it first
-				if raw, ok := req.Params.Arguments["url"].(string); ok && raw != "" {
-					// Fast MIME probe to avoid loading non-HTML resources in the browser
-					buf, ctype, looksHTML, err := probeURL(raw, 32*1024)
-					if err != nil {
-						return nil, fmt.Errorf("to_markdown probe error: %w", err)
-					}
-					if !looksHTML {
-						// Non-HTML → just return raw body/markdown
-						data := buf
-						if len(data) == 0 {
-							resp, err := http.Get(raw)
-							if err != nil {
-								return nil, fmt.Errorf("to_markdown fetch error: %w", err)
-							}
-							defer resp.Body.Close()
-							data, _ = io.ReadAll(resp.Body)
-							ctype = resp.Header.Get("Content-Type")
-						}
-						text, err := decodeToUTF8(data, ctype)
-						if err != nil {
-							return nil, fmt.Errorf("to_markdown decode error: %w", err)
-						}
-						log.Printf("[MCP] TOOL to_markdown non-HTML (%s) returning %d bytes", ctype, len(text))
-						return mcp.NewToolResultText(text), nil
-					}
-
-					page, err := LoadURL(raw)
-					if err != nil {
-						return nil, fmt.Errorf("to_markdown failed to load url %q: %w", raw, err)
-					}
-					body, err := page.Element("body")
-					if err != nil {
-						return nil, fmt.Errorf("to_markdown failed to select <body>: %w", err)
-					}
-					CurrentElement = body
-				}
-				if CurrentElement == nil {
-					return nil, fmt.Errorf("no element selected: use load_url and element-selection tools first")
-				}
-				// ensure Accessibility domain is on so heading levels and other AX properties exist
-				if err := (proto.AccessibilityEnable{}).Call(Page); err != nil {
-					return nil, fmt.Errorf("accessibility enable failed: %w", err)
-				}
-				// Describe current element to get backend node ID
-				props, err := CurrentElement.Describe(0, false)
-				if err != nil {
-					return nil, fmt.Errorf("describe element failed: %w", err)
-				}
-				// Query the accessibility tree
-				tree, err := proto.AccessibilityQueryAXTree{BackendNodeID: props.BackendNodeID}.Call(Page)
-				if err != nil {
-					return nil, fmt.Errorf("accessibility query failed: %w", err)
-				}
-				// Generate structured Markdown using shared converter
-				md := convertAXTreeToMarkdown(tree, Page)
-				log.Printf("[MCP] TOOL to_markdown RESULT length=%d", len(md))
-				return mcp.NewToolResultText(md), nil
-			})
+			log.Printf("[MCP] TOOL to_markdown CALLED args=%#v", req.Params.Arguments)
+			res, err := aitools.Call(ctx, "to_markdown", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 
@@ -465,14 +357,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithString("selector", mcp.Required(), mcp.Description("CSS selector to query")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					selector, _ := req.Params.Arguments["selector"].(string)
-					msg, err := mcpSearch(selector)
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL search CALLED args=%#v", req.Params.Arguments)
+				res, err := aitools.Call(ctx, "search", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -483,14 +373,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithString("level", mcp.Description("Heading level number (1-6)")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					level, _ := req.Params.Arguments["level"].(string)
-					msg, err := mcpHead(level)
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL head CALLED args=%#v", req.Params.Arguments)
+				res, err := aitools.Call(ctx, "head", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -501,18 +389,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithNumber("index", mcp.Description("optional index to jump to")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					var idxPtr *int
-					if v, ok := req.Params.Arguments["index"].(float64); ok {
-						i := int(v)
-						idxPtr = &i
-					}
-					msg, err := mcpNext(idxPtr)
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL next CALLED args=%#v", req.Params.Arguments)
+				res, err := aitools.Call(ctx, "next", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -523,18 +405,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithNumber("index", mcp.Description("optional index to jump to")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					var idxPtr *int
-					if v, ok := req.Params.Arguments["index"].(float64); ok {
-						i := int(v)
-						idxPtr = &i
-					}
-					msg, err := mcpPrev(idxPtr)
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL prev CALLED args=%#v", req.Params.Arguments)
+				res, err := aitools.Call(ctx, "prev", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -545,14 +421,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithString("selector", mcp.Required(), mcp.Description("CSS selector to resolve")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					selector, _ := req.Params.Arguments["selector"].(string)
-					msg, err := mcpElem(selector)
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL elem CALLED args=%#v", req.Params.Arguments)
+				res, err := aitools.Call(ctx, "elem", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -562,13 +436,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithDescription("Focus the first child element of the current selection."),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					msg, err := mcpChild()
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL child CALLED")
+				res, err := aitools.Call(ctx, "child", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -578,13 +451,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithDescription("Focus the parent element of the current selection."),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					msg, err := mcpParent()
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL parent CALLED")
+				res, err := aitools.Call(ctx, "parent", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -594,13 +466,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithDescription("Return the outer HTML of the current element that prior navigation selected."),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					html, err := mcpHTML()
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(html), nil
-				})
+				log.Printf("[MCP] TOOL html CALLED")
+				res, err := aitools.Call(ctx, "html", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -610,13 +481,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithDescription("Click the currently focused element; falls back to href navigation or synthetic click on failure."),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					msg, err := mcpClick()
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL click CALLED")
+				res, err := aitools.Call(ctx, "click", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 
@@ -627,14 +497,12 @@ func runMCP(cmd *cobra.Command, args []string) {
 				mcp.WithString("text", mcp.Required(), mcp.Description("Text to type")),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				return withPage(func() (*mcp.CallToolResult, error) {
-					text, _ := req.Params.Arguments["text"].(string)
-					msg, err := mcpType(text)
-					if err != nil {
-						return nil, err
-					}
-					return mcp.NewToolResultText(msg), nil
-				})
+				log.Printf("[MCP] TOOL type CALLED args=%#v", req.Params.Arguments)
+				res, err := aitools.Call(ctx, "type", req.Params.Arguments)
+				if err != nil {
+					return nil, err
+				}
+				return resultToMCP(res)
 			},
 		)
 	}
@@ -667,47 +535,66 @@ Wrap your code in an IIFE that returns a JSON‐serializable value. Example:
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return withPage(func() (*mcp.CallToolResult, error) {
-				log.Printf("[MCP] TOOL run_js CALLED args=%#v", req.Params.Arguments)
-
-				// extract showErrors flag
-				var showErrors bool
-				if v, ok := req.Params.Arguments["showErrors"].(bool); ok {
-					showErrors = v
-				}
-				if CurrentElement == nil {
-					msg := "run_js error: no element selected—call load_url and navigation tools first"
-					if showErrors {
-						return mcp.NewToolResultText(msg), nil
-					}
-					return nil, fmt.Errorf(msg)
-				}
-				script, _ := req.Params.Arguments["script"].(string)
-				// wrap any JS snippet in an IIFE so Element.Eval sees a function literal
-				wrapped := fmt.Sprintf("() => { return (%s); }", script)
-				value, err := CurrentElement.Eval(wrapped)
-				if err != nil {
-					if showErrors {
-						return mcp.NewToolResultText(fmt.Sprintf("run_js execution error: %v", err)), nil
-					}
-					return nil, fmt.Errorf("run_js execution error: %w", err)
-				}
-				resultJSON, err := json.Marshal(value.Value)
-				if err != nil {
-					if showErrors {
-						return mcp.NewToolResultText(fmt.Sprintf("run_js JSON marshal error: %v", err)), nil
-					}
-					return nil, fmt.Errorf("run_js JSON marshal error: %w", err)
-				}
-				log.Printf("[MCP] TOOL run_js RESULT length=%d", len(resultJSON))
-				return mcp.NewToolResultText(string(resultJSON)), nil
-			})
+			log.Printf("[MCP] TOOL run_js CALLED args=%#v", req.Params.Arguments)
+			res, err := aitools.Call(ctx, "run_js", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 
 	if err := server.ServeStdio(s); err != nil {
 		log.Printf("MCP server error: %v", err)
 	}
+}
+
+func resultToMCP(res aitools.Result) (*mcp.CallToolResult, error) {
+	if len(res.Binary) > 0 {
+		if res.ContentType == "" {
+			return nil, fmt.Errorf("binary result missing content type")
+		}
+		payload := base64.StdEncoding.EncodeToString(res.Binary)
+		caption := res.Text
+		if caption == "" {
+			caption = fmt.Sprintf("Binary result (%s, %d bytes)", res.ContentType, len(res.Binary))
+		}
+
+		if res.FilePath != "" {
+			resource := mcp.BlobResourceContents{
+				URI:      toFileURI(res.FilePath),
+				MIMEType: res.ContentType,
+				Blob:     payload,
+			}
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					mcp.TextContent{Type: "text", Text: caption},
+					mcp.EmbeddedResource{Type: "resource", Resource: resource},
+				},
+			}, nil
+		}
+
+		if strings.HasPrefix(res.ContentType, "image/") {
+			return mcp.NewToolResultImage(caption, payload, res.ContentType), nil
+		}
+
+		uri := res.InlineURI
+		if uri == "" {
+			uri = fmt.Sprintf("inline:%s", res.ContentType)
+		}
+		resource := mcp.BlobResourceContents{
+			URI:      uri,
+			MIMEType: res.ContentType,
+			Blob:     payload,
+		}
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				mcp.TextContent{Type: "text", Text: caption},
+				mcp.EmbeddedResource{Type: "resource", Resource: resource},
+			},
+		}, nil
+	}
+	return mcp.NewToolResultText(res.Text), nil
 }
 
 // helper function for logging large results
@@ -726,223 +613,17 @@ func boolArg(args map[string]interface{}, key string) bool {
 }
 
 func mcpHandleCaptureScreenshot(args map[string]interface{}) (*mcp.CallToolResult, error) {
-	return withPage(func() (*mcp.CallToolResult, error) {
-		rawURL := mcp.ExtractString(args, "url")
-		if strings.TrimSpace(rawURL) != "" {
-			if _, err := LoadURL(rawURL); err != nil {
-				return nil, fmt.Errorf("capture_screenshot load url %q: %w", rawURL, err)
-			}
-		}
-		if Page == nil {
-			return nil, fmt.Errorf("capture_screenshot: no page loaded – call load_url first or provide url")
-		}
-
-		selector := mcp.ExtractString(args, "selector")
-		fullPage := false
-		if v, ok := args["full_page"].(bool); ok {
-			fullPage = v
-		}
-		scroll := false
-		if v, ok := args["scroll"].(bool); ok {
-			scroll = v
-		}
-		if selector != "" && scroll {
-			return nil, fmt.Errorf("capture_screenshot: selector capture cannot be combined with scroll")
-		}
-		if selector != "" && fullPage {
-			return nil, fmt.Errorf("capture_screenshot: selector capture cannot be combined with full_page")
-		}
-		if scroll && fullPage {
-			return nil, fmt.Errorf("capture_screenshot: choose either scroll or full_page, not both")
-		}
-
-		format := strings.TrimSpace(strings.ToLower(mcp.ExtractString(args, "format")))
-		if format == "" {
-			format = "png"
-		}
-
-		var qualityPtr *int
-		if v, ok := args["quality"].(float64); ok {
-			q := int(v)
-			qualityPtr = &q
-		} else if format == "jpeg" || format == "jpg" {
-			q := 90
-			qualityPtr = &q
-		}
-
-		opts := browser.ScreenshotOptions{
-			Selector: selector,
-			FullPage: fullPage,
-			Scroll:   scroll,
-			Format:   format,
-			Quality:  qualityPtr,
-		}
-		result, err := captureScreenshotFunc(Page, opts)
-		if err != nil {
-			return nil, err
-		}
-
-		delivery := strings.TrimSpace(strings.ToLower(mcp.ExtractString(args, "return")))
-		if delivery == "" {
-			delivery = "binary"
-		}
-		if delivery == "binary" && len(result.Data) > inlineBinaryLimit {
-			delivery = "file"
-		}
-
-		formatExt := "png"
-		if isJPEGFormat(format) {
-			formatExt = "jpg"
-		}
-
-		caption := fmt.Sprintf("Captured screenshot (%s, %d bytes).", result.MimeType, len(result.Data))
-		if selector != "" {
-			caption = fmt.Sprintf("Captured screenshot of %q (%s, %d bytes).", selector, result.MimeType, len(result.Data))
-		} else if rawURL != "" {
-			caption = fmt.Sprintf("Captured screenshot of %s (%s, %d bytes).", rawURL, result.MimeType, len(result.Data))
-		}
-
-		switch delivery {
-		case "file":
-			output := mcp.ExtractString(args, "output")
-			path, err := resolveOutputPath(output, "", "", "screenshot", formatExt)
-			if err != nil {
-				return nil, err
-			}
-			if err := os.WriteFile(path, result.Data, 0644); err != nil {
-				return nil, fmt.Errorf("capture_screenshot write file: %w", err)
-			}
-			payload := base64.StdEncoding.EncodeToString(result.Data)
-			resource := mcp.BlobResourceContents{
-				URI:      toFileURI(path),
-				MIMEType: result.MimeType,
-				Blob:     payload,
-			}
-			text := fmt.Sprintf("%s Saved to %s.", caption, path)
-			log.Printf("[MCP] TOOL capture_screenshot RESULT saved=%s bytes=%d", path, len(result.Data))
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.TextContent{Type: "text", Text: text},
-					mcp.EmbeddedResource{Type: "resource", Resource: resource},
-				},
-			}, nil
-		default:
-			payload := base64.StdEncoding.EncodeToString(result.Data)
-			log.Printf("[MCP] TOOL capture_screenshot RESULT inline bytes=%d", len(result.Data))
-			return mcp.NewToolResultImage(caption, payload, result.MimeType), nil
-		}
-	})
+	res, err := aitools.Call(context.Background(), "capture_screenshot", args)
+	if err != nil {
+		return nil, err
+	}
+	return resultToMCP(res)
 }
 
 func mcpHandleCapturePDF(args map[string]interface{}) (*mcp.CallToolResult, error) {
-	return withPage(func() (*mcp.CallToolResult, error) {
-		rawURL := mcp.ExtractString(args, "url")
-		if strings.TrimSpace(rawURL) != "" {
-			if _, err := LoadURL(rawURL); err != nil {
-				return nil, fmt.Errorf("capture_pdf load url %q: %w", rawURL, err)
-			}
-		}
-		if Page == nil {
-			return nil, fmt.Errorf("capture_pdf: no page loaded – call load_url first or provide url")
-		}
-
-		opts := browser.PDFOptions{
-			Landscape:               boolArg(args, "landscape"),
-			DisplayHeaderFooter:     boolArg(args, "header_footer"),
-			PrintBackground:         boolArg(args, "background"),
-			PreferCSSPageSize:       boolArg(args, "prefer_css_page_size"),
-			GenerateTaggedPDF:       boolArg(args, "tagged"),
-			GenerateDocumentOutline: boolArg(args, "outline"),
-			PageRanges:              mcp.ExtractString(args, "page_ranges"),
-			HeaderTemplate:          mcp.ExtractString(args, "header_template"),
-			FooterTemplate:          mcp.ExtractString(args, "footer_template"),
-		}
-
-		if v, ok := args["scale"].(float64); ok {
-			val := v
-			opts.Scale = &val
-		}
-		if v, ok := args["paper_width"].(float64); ok {
-			val := v
-			opts.PaperWidth = &val
-		}
-		if v, ok := args["paper_height"].(float64); ok {
-			val := v
-			opts.PaperHeight = &val
-		}
-		if v, ok := args["margin_top"].(float64); ok {
-			val := v
-			opts.MarginTop = &val
-		}
-		if v, ok := args["margin_bottom"].(float64); ok {
-			val := v
-			opts.MarginBottom = &val
-		}
-		if v, ok := args["margin_left"].(float64); ok {
-			val := v
-			opts.MarginLeft = &val
-		}
-		if v, ok := args["margin_right"].(float64); ok {
-			val := v
-			opts.MarginRight = &val
-		}
-
-		result, err := capturePDFFunc(Page, opts)
-		if err != nil {
-			return nil, err
-		}
-
-		delivery := strings.TrimSpace(strings.ToLower(mcp.ExtractString(args, "return")))
-		if delivery == "" {
-			delivery = "binary"
-		}
-		if delivery == "binary" && len(result.Data) > inlineBinaryLimit {
-			delivery = "file"
-		}
-
-		caption := fmt.Sprintf("Captured PDF (%d bytes).", len(result.Data))
-		if rawURL != "" {
-			caption = fmt.Sprintf("Captured PDF of %s (%d bytes).", rawURL, len(result.Data))
-		}
-
-		payload := base64.StdEncoding.EncodeToString(result.Data)
-
-		switch delivery {
-		case "file":
-			output := mcp.ExtractString(args, "output")
-			path, err := resolveOutputPath(output, "", "", "page", "pdf")
-			if err != nil {
-				return nil, err
-			}
-			if err := os.WriteFile(path, result.Data, 0644); err != nil {
-				return nil, fmt.Errorf("capture_pdf write file: %w", err)
-			}
-			resource := mcp.BlobResourceContents{
-				URI:      toFileURI(path),
-				MIMEType: result.MimeType,
-				Blob:     payload,
-			}
-			text := fmt.Sprintf("%s Saved to %s.", caption, path)
-			log.Printf("[MCP] TOOL capture_pdf RESULT saved=%s bytes=%d", path, len(result.Data))
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.TextContent{Type: "text", Text: text},
-					mcp.EmbeddedResource{Type: "resource", Resource: resource},
-				},
-			}, nil
-		default:
-			resource := mcp.BlobResourceContents{
-				URI:      "inline:pdf",
-				MIMEType: result.MimeType,
-				Blob:     payload,
-			}
-			log.Printf("[MCP] TOOL capture_pdf RESULT inline bytes=%d", len(result.Data))
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					mcp.TextContent{Type: "text", Text: caption},
-					mcp.EmbeddedResource{Type: "resource", Resource: resource},
-				},
-			}, nil
-		}
-	})
+	res, err := aitools.Call(context.Background(), "capture_pdf", args)
+	if err != nil {
+		return nil, err
+	}
+	return resultToMCP(res)
 }
