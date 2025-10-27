@@ -107,12 +107,64 @@ func teeStream(target **os.File, original *os.File, logDest *os.File) error {
 		return err
 	}
 	*target = w
-	mw := io.MultiWriter(original, logDest)
+	mw := io.MultiWriter(original, newTimestampWriter(logDest))
 	go func() {
 		_, _ = io.Copy(mw, r)
 	}()
 	logPipeWriters = append(logPipeWriters, w)
 	return nil
+}
+
+type timestampWriter struct {
+	dst     io.Writer
+	mu      sync.Mutex
+	pending []byte
+}
+
+func newTimestampWriter(dst io.Writer) io.Writer {
+	if dst == nil {
+		return dst
+	}
+	return &timestampWriter{dst: dst}
+}
+
+func (w *timestampWriter) Write(p []byte) (int, error) {
+	if w == nil {
+		return len(p), nil
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	consumed := 0
+	for len(p) > 0 {
+		idx := bytes.IndexByte(p, '\n')
+		if idx == -1 {
+			w.pending = append(w.pending, p...)
+			consumed += len(p)
+			break
+		}
+
+		w.pending = append(w.pending, p[:idx]...)
+		line := string(w.pending)
+		w.pending = w.pending[:0]
+		consumed += idx + 1
+		p = p[idx+1:]
+
+		timestamp := time.Now().Format(time.RFC3339)
+		var out bytes.Buffer
+		out.Grow(len(timestamp) + len(line) + 4)
+		out.WriteByte('[')
+		out.WriteString(timestamp)
+		out.WriteString("] ")
+		out.WriteString(line)
+		out.WriteByte('\n')
+
+		if _, err := w.dst.Write(out.Bytes()); err != nil {
+			return consumed, err
+		}
+	}
+	return consumed, nil
 }
 
 func isTerminalFile(f *os.File) bool {

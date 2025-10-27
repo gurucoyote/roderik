@@ -20,7 +20,7 @@
 - Dynamic system prompt assembly must be efficient and accurate; avoid excess CDP calls when collecting session context.
 
 ## High-Level Architecture
-- **Chat Command:** Cobra command `ai` (alias `chat`) integrates with the existing Roderik REPL so prompts prefixed with `ai`/`chat` are routed to the LLM; other inputs continue to drive standard browser commands.
+- **Chat Command:** Cobra command `ai` (alias `chat`) remains the explicit entrypoint; users invoke `roderik ai <prompt>` (or run `roderik ai` interactively) rather than prefixed REPL shortcuts.
 - **Profile Loader:** Layer that merges profile config + CLI flags + env overrides to produce an `LLMProfile` (OpenAI-compatible provider, model, base URL, API key, tool behavior).
 - **Dynamic Context Builder:** Gathers live session state (current URL, focused element summary, navigation flags) and feeds it into the system prompt template before each LLM call.
 - **History Manager:** Adapt or embed `kai/pkg/history` for message storage/pruning based on window size.
@@ -41,10 +41,11 @@
 ## Latest Status – October 27, 2025
 - Implemented initial `roderik ai` / `roderik chat` Cobra command that wraps a `ChatSession` and reuses the shared MCP tool registry for tool dispatch; prompts require a single-turn message for now.
 - Refactored the OpenAI provider to drop the `charmbracelet/log` dependency in favor of an injectable no-op logger and added `SetSystemPrompt`, letting the chat loop refresh instructions every tool iteration.
-- System prompt builder is in place with browser URL/title capture and tool listings; focused-element details are still coarse (“element selected”) and should be expanded to include richer attributes later.
-- Chat session maintains in-memory history with a configurable `--history-window`; additional persistence/profiles remain TODO.
-- Chat loop now emits `[AI]` logs for each prompt, LLM iteration, tool call, and tool result so operators can audit every step while watching stderr.
+- System prompt builder now includes browser URL/title, focused-element metadata (with heading/link hints), current datetime, and guidance to stay on the loaded page unless the user explicitly requests external search.
+- Chat session maintains in-memory history with a configurable `--history-window`; stored messages/tool results are trimmed to keep token usage lean while preserving the latest tool-call context.
+- Chat loop now emits `[AI]` logs for each prompt, LLM iteration (with token counts), tool call, and tool result so operators can audit every step while watching stderr.
 - Added `--logfile` flag so sessions can tee stdout, stderr, and user keystrokes into `roderik.log` (or a custom path) without breaking interactive mode.
+- DuckDuckGo search tool is available for opt-in web lookups via the shared handler registry.
 - `./cache-and-test.sh` passes, confirming the new command wires cleanly into existing tests and Windows cross-build.
 
 ## System Prompt Outline
@@ -73,7 +74,7 @@
    - Add command `roderik ai profiles list` (optional, nice-to-have) or at least helpful errors.
 5. **Chat Command Skeleton**
    - Create Cobra command `ai` (alias `chat`) with flags (`--profile`, `--history-window`, verbosity reuse).
-   - Hook into the existing Roderik REPL so user input prefixed with `ai`/`chat` invokes the LLM pipeline; unprefixed commands continue to execute normal browser actions.
+   - Keep the chat loop scoped to the dedicated Cobra subcommand; document the explicit invocation pattern instead of REPL-prefixed shortcuts.
    - Implement streaming output borrowing Kai’s line-buffered writer; support `/exit` or EOF to leave chat mode.
 6. **Tool Invocation Loop**
    - Convert MCP tool schemas to provider tool definitions (namespacing + sanitization).

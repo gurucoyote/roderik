@@ -11,10 +11,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/mark3labs/mcp-go/mcp"
 	"roderik/browser"
+	duckduck "roderik/duckduck"
 	aitools "roderik/internal/ai/tools"
 )
 
@@ -47,6 +49,7 @@ func registerHandlers() {
 		aitools.RegisterHandler("computedstyles", computedStylesHandler)
 		aitools.RegisterHandler("describe", describeHandler)
 		aitools.RegisterHandler("xpath", xpathHandler)
+		aitools.RegisterHandler("duck", duckHandler)
 		// Additional tool handlers will be registered here as they migrate.
 	})
 }
@@ -426,6 +429,10 @@ func toMarkdownHandler(ctx context.Context, args map[string]interface{}) (aitool
 			return aitools.Result{}, fmt.Errorf("no element selected: use load_url and element-selection tools first")
 		}
 
+		if Page != nil {
+			Page.Timeout(10 * time.Second).WaitLoad()
+		}
+
 		if err := (proto.AccessibilityEnable{}).Call(Page); err != nil {
 			return aitools.Result{}, fmt.Errorf("accessibility enable failed: %w", err)
 		}
@@ -491,6 +498,72 @@ func runJSHandler(ctx context.Context, args map[string]interface{}) (aitools.Res
 		log.Printf("[TOOLS] run_js RESULT length=%d", len(resultJSON))
 		return aitools.Result{Text: string(resultJSON)}, nil
 	})
+}
+
+var (
+	duckClientOnce sync.Once
+	duckClient     duckduck.SearchClient
+)
+
+func ensureDuckClient() duckduck.SearchClient {
+	duckClientOnce.Do(func() {
+		client := duckduck.NewDuckDuckGoSearchClient()
+		client.InitialDelay = 0
+		client.Backoff = 2 * time.Second
+		client.MaxRetries = 2
+		duckClient = client
+	})
+	return duckClient
+}
+
+func duckHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
+	log.Printf("[TOOLS] duck CALLED args=%#v", args)
+
+	query := strings.TrimSpace(mcp.ExtractString(args, "query"))
+	if query == "" {
+		return aitools.Result{}, fmt.Errorf("duck: query argument is required")
+	}
+
+	limit := 20
+	if v, ok := args["num"].(float64); ok {
+		if n := int(v); n > 0 {
+			limit = n
+		}
+	}
+
+	client := ensureDuckClient()
+	results, err := client.SearchLimited(query, limit)
+	if err != nil {
+		return aitools.Result{}, fmt.Errorf("duck search failed: %w", err)
+	}
+	if len(results) == 0 {
+		return aitools.Result{Text: fmt.Sprintf("duck search found no results for %q.", query)}, nil
+	}
+
+	var b strings.Builder
+	for i, res := range results {
+		if i >= limit && limit > 0 {
+			break
+		}
+		url := strings.TrimSpace(res.FormattedUrl)
+		title := strings.TrimSpace(res.Title)
+		if title == "" {
+			title = url
+		}
+		snippet := strings.TrimSpace(res.Snippet)
+		if snippet != "" {
+			snippet = truncateContextText(snippet, 220)
+		}
+		fmt.Fprintf(&b, "%d. %s\n", i+1, title)
+		if url != "" {
+			fmt.Fprintf(&b, "   %s\n", url)
+		}
+		if snippet != "" {
+			fmt.Fprintf(&b, "   %s\n", snippet)
+		}
+	}
+
+	return aitools.Result{Text: b.String()}, nil
 }
 
 func searchHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {

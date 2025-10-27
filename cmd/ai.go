@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -22,9 +21,10 @@ const (
 	defaultAIHistoryWindow   = 16
 	defaultAIRequestTimeout  = 90 * time.Second
 	systemPromptHeader       = "You are Roderik's integrated AI assistant. Use the provided browser tools to inspect pages, gather evidence, and complete tasks carefully."
-	systemPromptGuidelines   = "Guidelines:\n- Prefer calling tools to inspect the live browser when information is uncertain.\n- Confirm before performing destructive or irreversible actions.\n- Keep responses concise when no further action is required.\n- When a tool call returns data, summarize the key points before continuing."
+	systemPromptGuidelines   = "Guidelines:\n- Prefer calling tools to inspect the live browser when information is uncertain.\n- Confirm before performing destructive or irreversible actions.\n- Keep responses concise when no further action is required.\n- When a tool call returns data, summarize the key points before continuing.\n- Default to the currently loaded page for evidence; only use external search tools (e.g., duck) when the user explicitly requests web search.\n- Tools operate on the currently focused element; use parent/child/head/next or reload the page to broaden scope before summarizing full-page content.\n- After navigation, Roderik auto-focuses the first visible heading; verify or adjust the selection before assuming page-wide context."
 	systemPromptContextIntro = "Current browser context:"
 	systemPromptToolsIntro   = "Available tools:"
+	systemPromptTimeIntro    = "Current datetime (system clock):"
 )
 
 var (
@@ -33,12 +33,13 @@ var (
 	chatSession *ChatSession
 
 	aiCmd = &cobra.Command{
-		Use:     "ai [message]",
-		Aliases: []string{"chat"},
-		Short:   "Chat with the integrated AI assistant",
-		Long:    "Send a prompt to the built-in AI assistant. The assistant can call Roderik tools to interact with the active browser session.",
-		Args:    cobra.ArbitraryArgs,
-		RunE:    runAICommand,
+		Use:          "ai [message]",
+		Aliases:      []string{"chat"},
+		Short:        "Chat with the integrated AI assistant",
+		Long:         "Send a prompt to the built-in AI assistant. The assistant can call Roderik tools to interact with the active browser session.",
+		Args:         cobra.ArbitraryArgs,
+		RunE:         runAICommand,
+		SilenceUsage: true,
 	}
 )
 
@@ -142,28 +143,31 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 		return "", fmt.Errorf("prompt cannot be empty")
 	}
 
-	logAI("user prompt: %s", truncateForLog(input, 512))
-
-	userMsg := &history.HistoryMessage{
-		Role: "user",
-		Content: []history.ContentBlock{
-			{Type: "text", Text: input},
-		},
-	}
+	userMsg := history.NewUserMessage(input)
 	s.history = append(s.history, userMsg)
 	s.prune()
 
 	const maxIterations = 8
 	for i := 0; i < maxIterations; i++ {
 		s.provider.SetSystemPrompt(buildSystemPrompt(s.tools))
-
-		logAI("llm iteration %d: sending %d history messages with %d tools", i+1, len(s.history), len(s.tools))
+		historyLen := len(s.history)
 		resp, err := s.provider.CreateMessage(ctx, "", s.history, s.tools)
 		if err != nil {
 			return "", err
 		}
+		promptTokens, completionTokens := resp.GetUsage()
+		logAI(
+			"llm iteration %d: history=%d tools=%d prompt_tokens=%s completion_tokens=%s",
+			i+1,
+			historyLen,
+			len(s.tools),
+			formatTokenCount(promptTokens),
+			formatTokenCount(completionTokens),
+		)
 
-		s.history = append(s.history, resp)
+		if cloned := history.CloneAssistantMessage(resp); cloned != nil {
+			s.history = append(s.history, cloned)
+		}
 		s.prune()
 
 		toolCalls := resp.GetToolCalls()
@@ -183,8 +187,7 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 				callErr = fmt.Errorf("tool %q is not registered", sanitized)
 				logAI("tool call skipped: %s (unknown sanitized name)", sanitized)
 			} else {
-				argsJSON := marshalForLog(call.GetArguments())
-				logAI("tool call start: %s (sanitized=%s) args=%s", def.Name, sanitized, argsJSON)
+				logAI("tool call start: %s (sanitized=%s)", def.Name, sanitized)
 				result, err := aitools.Call(ctx, def.Name, call.GetArguments())
 				if err != nil {
 					callErr = err
@@ -205,7 +208,9 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			s.history = append(s.history, toolMsg)
+			if cloned := history.CloneToolMessage(toolMsg); cloned != nil {
+				s.history = append(s.history, cloned)
+			}
 			s.prune()
 		}
 	}
@@ -225,14 +230,6 @@ func truncateForLog(s string, limit int) string {
 		return s[:limit]
 	}
 	return s[:limit-3] + "..."
-}
-
-func marshalForLog(v interface{}) string {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return fmt.Sprintf("<marshal error: %v>", err)
-	}
-	return truncateForLog(string(data), 512)
 }
 
 func summarizeToolResult(res aitools.Result) string {
@@ -255,10 +252,13 @@ func (s *ChatSession) prune() {
 		return
 	}
 	if len(s.history) <= s.historyWindow {
+		// still enforce invariants
+		s.history = sanitizeHistory(s.history)
 		return
 	}
 	start := len(s.history) - s.historyWindow
 	s.history = append([]llm.Message(nil), s.history[start:]...)
+	s.history = sanitizeHistory(s.history)
 }
 
 func buildSystemPrompt(tools []llm.Tool) string {
@@ -270,6 +270,13 @@ func buildSystemPrompt(tools []llm.Tool) string {
 		b.WriteString(systemPromptContextIntro)
 		b.WriteString("\n")
 		b.WriteString(ctx)
+		b.WriteString("\n\n")
+	}
+
+	if ts := currentDateTimeSummary(); ts != "" {
+		b.WriteString(systemPromptTimeIntro)
+		b.WriteString("\n- ")
+		b.WriteString(ts)
 		b.WriteString("\n\n")
 	}
 
@@ -311,10 +318,165 @@ func browserContextSummary() string {
 	if title := strings.TrimSpace(info.Title); title != "" {
 		lines = append(lines, "- Title: "+title)
 	}
-	if CurrentElement != nil {
-		lines = append(lines, "- A DOM element is currently selected.")
+	if summary, isHeading, isLink := focusedElementSummary(); summary != "" {
+		lines = append(lines, summary)
+		lines = append(lines, "- Focus tip: tools operate on the focused element; adjust focus (parent/child/head/next) or reload before expecting broader context.")
+		if isHeading {
+			lines = append(lines, "- Selection tip: current focus is a heading; expand to its parent or body before extracting section details.")
+		}
+		if isLink {
+			lines = append(lines, "- Selection tip: current focus is a link; follow it with click or move to its parent to read nearby text.")
+		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func currentDateTimeSummary() string {
+	now := time.Now().Format(time.RFC3339)
+	return strings.TrimSpace(now)
+}
+
+func focusedElementSummary() (string, bool, bool) {
+	if CurrentElement == nil {
+		return "", false, false
+	}
+
+	props, err := CurrentElement.Describe(0, false)
+	if err != nil {
+		if Verbose {
+			fmt.Fprintf(os.Stderr, "warning: failed to describe current element: %v\n", err)
+		}
+		return "- Focused element: unable to describe current selection.", false, false
+	}
+	if props == nil {
+		return "", false, false
+	}
+
+	tag := strings.ToLower(strings.TrimSpace(props.NodeName))
+	if tag == "" {
+		tag = "element"
+	}
+
+	attrSummary := summarizeKeyAttributes(props.Attributes)
+
+	textSnippet := ""
+	if txt, err := CurrentElement.Text(); err == nil {
+		txt = strings.Join(strings.Fields(txt), " ")
+		textSnippet = truncateContextText(txt, 120)
+	} else if Verbose {
+		fmt.Fprintf(os.Stderr, "warning: failed to read text for current element: %v\n", err)
+	}
+
+	var b strings.Builder
+	b.WriteString("- Focused element: <")
+	b.WriteString(tag)
+	if attrSummary != "" {
+		b.WriteByte(' ')
+		b.WriteString(attrSummary)
+	}
+	b.WriteString(">")
+	if textSnippet != "" {
+		b.WriteString(` text≈"`)
+		b.WriteString(textSnippet)
+		b.WriteByte('"')
+	}
+
+	isHeading := strings.HasPrefix(tag, "h") && len(tag) == 2 && tag[1] >= '1' && tag[1] <= '6'
+	isLink := tag == "a"
+	return b.String(), isHeading, isLink
+}
+
+func summarizeKeyAttributes(attrs []string) string {
+	if len(attrs) == 0 {
+		return ""
+	}
+	var parts []string
+	for i := 0; i+1 < len(attrs); i += 2 {
+		key := strings.ToLower(strings.TrimSpace(attrs[i]))
+		value := strings.TrimSpace(attrs[i+1])
+		if value == "" {
+			continue
+		}
+		switch key {
+		case "id", "class", "role", "name", "aria-label":
+			parts = append(parts, fmt.Sprintf(`%s="%s"`, key, truncateContextText(value, 60)))
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func truncateContextText(s string, limit int) string {
+	s = strings.TrimSpace(s)
+	if limit <= 0 || s == "" {
+		return s
+	}
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+	if limit <= 3 {
+		return string(runes[:limit])
+	}
+	return string(runes[:limit-3]) + "..."
+}
+
+func sanitizeHistory(messages []llm.Message) []llm.Message {
+	if len(messages) == 0 {
+		return messages
+	}
+	clean := make([]llm.Message, 0, len(messages))
+	var lastToolCallIDs map[string]struct{}
+
+	appendMessage := func(msg llm.Message) {
+		if msg == nil {
+			return
+		}
+		role := msg.GetRole()
+		if len(clean) == 0 && role != "user" {
+			return
+		}
+		switch role {
+		case "tool":
+			if len(clean) == 0 {
+				return
+			}
+			if lastToolCallIDs == nil || len(lastToolCallIDs) == 0 {
+				return
+			}
+			if id := msg.GetToolResponseID(); id != "" {
+				if _, ok := lastToolCallIDs[id]; !ok {
+					return
+				}
+				// tool response consumed; keep mapping for potential multiple results
+			}
+		default:
+			// recompute tool call ids for subsequent tool messages
+			if calls := msg.GetToolCalls(); len(calls) > 0 {
+				lastToolCallIDs = make(map[string]struct{}, len(calls))
+				for _, call := range calls {
+					if call == nil {
+						continue
+					}
+					lastToolCallIDs[call.GetID()] = struct{}{}
+				}
+			} else {
+				lastToolCallIDs = nil
+			}
+		}
+		clean = append(clean, msg)
+	}
+
+	for _, msg := range messages {
+		appendMessage(msg)
+	}
+	return clean
+}
+
+func formatTokenCount(n int) string {
+	if n <= 0 {
+		return "?"
+	}
+	return strconv.Itoa(n)
 }
 
 func toolResultPayload(res aitools.Result) interface{} {

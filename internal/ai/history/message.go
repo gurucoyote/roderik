@@ -64,6 +64,107 @@ func (m *HistoryMessage) GetUsage() (int, int) {
 	return 0, 0 // History doesn't track usage
 }
 
+const (
+	maxUserContentLen      = 800
+	maxAssistantContentLen = 900
+	maxToolContentLen      = 900
+)
+
+// NewUserMessage creates a user history entry with trimmed content.
+func NewUserMessage(text string) *HistoryMessage {
+	content := summarizeText(text, maxUserContentLen)
+	return &HistoryMessage{
+		Role: "user",
+		Content: []ContentBlock{
+			{
+				Type: "text",
+				Text: content,
+			},
+		},
+	}
+}
+
+// CloneAssistantMessage converts an assistant/provider message into a compact history entry.
+func CloneAssistantMessage(msg llm.Message) llm.Message {
+	if msg == nil {
+		return nil
+	}
+	role := msg.GetRole()
+	if role == "" {
+		role = "assistant"
+	}
+	h := &HistoryMessage{Role: role}
+
+	if text := summarizeText(msg.GetContent(), maxAssistantContentLen); text != "" {
+		h.Content = append(h.Content, ContentBlock{
+			Type: "text",
+			Text: text,
+		})
+	}
+
+	for _, call := range msg.GetToolCalls() {
+		if call == nil {
+			continue
+		}
+		args := call.GetArguments()
+		data, _ := json.Marshal(args)
+		h.Content = append(h.Content, ContentBlock{
+			Type: "tool_use",
+			ID:   call.GetID(),
+			Name: call.GetName(),
+			Input: func() json.RawMessage {
+				if len(data) == 0 {
+					return nil
+				}
+				return data
+			}(),
+		})
+	}
+
+	if len(h.Content) == 0 {
+		return nil
+	}
+	return h
+}
+
+// CloneToolMessage converts a tool response message into a compact history entry.
+func CloneToolMessage(msg llm.Message) llm.Message {
+	if msg == nil {
+		return nil
+	}
+	text := summarizeText(msg.GetContent(), maxToolContentLen)
+	if text == "" && msg.GetToolResponseID() == "" {
+		return nil
+	}
+
+	block := ContentBlock{
+		Type:      "tool_result",
+		ToolUseID: msg.GetToolResponseID(),
+		Text:      text,
+	}
+
+	return &HistoryMessage{
+		Role:    "tool",
+		Content: []ContentBlock{block},
+	}
+}
+
+func summarizeText(text string, limit int) string {
+	text = strings.TrimSpace(text)
+	if text == "" || limit <= 0 {
+		return ""
+	}
+	normalized := strings.Join(strings.Fields(text), " ")
+	if len([]rune(normalized)) <= limit {
+		return normalized
+	}
+	runes := []rune(normalized)
+	if limit <= 3 {
+		return string(runes[:limit])
+	}
+	return string(runes[:limit-3]) + "..."
+}
+
 // HistoryToolCall implements llm.ToolCall for stored tool calls
 type HistoryToolCall struct {
 	id   string
