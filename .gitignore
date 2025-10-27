@@ -5,3 +5,6 @@ examples/*
 roderik
 assets
 .env
+kai
+*json
+.cache
