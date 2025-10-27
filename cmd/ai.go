@@ -8,6 +8,7 @@ import (
 	"net"
 	neturl "net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"roderik/internal/ai/history"
 	"roderik/internal/ai/llm"
 	"roderik/internal/ai/llm/openai"
+	"roderik/internal/ai/profile"
 	aitools "roderik/internal/ai/tools"
 )
 
@@ -32,6 +34,7 @@ const (
 
 var (
 	aiHistoryWindow int
+	aiModelProfile  string
 
 	chatSession *ChatSession
 
@@ -48,15 +51,17 @@ var (
 
 func init() {
 	aiCmd.Flags().IntVar(&aiHistoryWindow, "history-window", defaultAIHistoryWindow, "Number of recent AI chat messages to retain (0 keeps the full history)")
+	aiCmd.Flags().StringVarP(&aiModelProfile, "model", "m", "", "Model profile to use for the AI assistant (defaults to config or environment)")
 	RootCmd.AddCommand(aiCmd)
 }
 
 type ChatSession struct {
-	provider      llm.Provider
-	tools         []llm.Tool
-	toolRegistry  map[string]aitools.Definition
-	history       []llm.Message
-	historyWindow int
+	provider         llm.Provider
+	tools            []llm.Tool
+	toolRegistry     map[string]aitools.Definition
+	history          []llm.Message
+	historyWindow    int
+	baseSystemPrompt string
 }
 
 func runAICommand(cmd *cobra.Command, args []string) error {
@@ -95,30 +100,40 @@ func ensureChatSession() (*ChatSession, error) {
 		return chatSession, nil
 	}
 
-	apiKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+	loader := profile.Loader{}
+	modelProfile, err := loader.Load(aiModelProfile)
+	if err != nil {
+		return nil, err
+	}
+
+	apiKey := strings.TrimSpace(modelProfile.APIKey)
 	if apiKey == "" {
-		return nil, fmt.Errorf("OPENAI_API_KEY is not set")
-	}
-
-	baseURL := strings.TrimSpace(os.Getenv("OPENAI_API_BASE"))
-	if baseURL == "" {
-		baseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
-	}
-
-	model := strings.TrimSpace(os.Getenv("RODERIK_AI_MODEL"))
-	if model == "" {
-		model = defaultAIModel
-	}
-
-	maxTokens := 0
-	if raw := strings.TrimSpace(os.Getenv("RODERIK_AI_MAX_TOKENS")); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
-			maxTokens = parsed
+		profileName := modelProfile.Name
+		if profileName == "" {
+			profileName = "(default)"
 		}
+		return nil, fmt.Errorf("no API key configured; set OPENAI_API_KEY or define one for the %q model profile", profileName)
+	}
+
+	providerName := strings.ToLower(strings.TrimSpace(modelProfile.Provider))
+	if providerName == "" {
+		providerName = "openai"
+	}
+
+	if providerName != "openai" {
+		profileName := modelProfile.Name
+		if profileName == "" {
+			profileName = "(default)"
+		}
+		return nil, fmt.Errorf("model profile %q references unsupported provider %q", profileName, modelProfile.Provider)
+	}
+
+	if strings.TrimSpace(modelProfile.Model) == "" {
+		modelProfile.Model = defaultAIModel
 	}
 
 	tools, mapping := aitools.LLMTools("roderik")
-	provider := openai.NewProvider(apiKey, baseURL, model, "", maxTokens)
+	provider := openai.NewProvider(apiKey, modelProfile.BaseURL, modelProfile.Model, modelProfile.SystemPrompt, modelProfile.MaxTokens)
 	if Verbose {
 		provider.SetDebugLogger(func(msg string) {
 			fmt.Fprintln(os.Stderr, msg)
@@ -126,12 +141,21 @@ func ensureChatSession() (*ChatSession, error) {
 	}
 
 	chatSession = &ChatSession{
-		provider:      provider,
-		tools:         tools,
-		toolRegistry:  mapping,
-		historyWindow: aiHistoryWindow,
+		provider:         provider,
+		tools:            tools,
+		toolRegistry:     mapping,
+		historyWindow:    aiHistoryWindow,
+		baseSystemPrompt: strings.TrimSpace(modelProfile.SystemPrompt),
 	}
-	logAI("session initialized (model=%s base_url=%s tools=%d history_window=%d)", model, baseURL, len(tools), aiHistoryWindow)
+	logAI("session initialized (profile=%s provider=%s model=%s base_url=%s max_tokens=%d tools=%d history_window=%d)",
+		profileNameOrDefault(modelProfile.Name),
+		providerName,
+		modelProfile.Model,
+		modelProfile.BaseURL,
+		modelProfile.MaxTokens,
+		len(tools),
+		aiHistoryWindow,
+	)
 	return chatSession, nil
 }
 
@@ -151,8 +175,13 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 	s.prune()
 
 	const maxIterations = 8
+	var lastToolSummary string
 	for i := 0; i < maxIterations; i++ {
-		s.provider.SetSystemPrompt(buildSystemPrompt(s.tools))
+		fullPrompt := buildSystemPrompt(s.tools)
+		if s.baseSystemPrompt != "" {
+			fullPrompt = s.baseSystemPrompt + "\n\n" + fullPrompt
+		}
+		s.provider.SetSystemPrompt(fullPrompt)
 		historyLen := len(s.history)
 		resp, err := s.provider.CreateMessage(ctx, "", s.history, s.tools)
 		if err != nil {
@@ -183,6 +212,12 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 
 		toolCalls := resp.GetToolCalls()
 		if len(toolCalls) == 0 {
+			if inline := synthesizeInlineToolCalls(resp.GetContent()); len(inline) > 0 {
+				logAI("detected inline tool call markup; synthesizing %d tool call(s)", len(inline))
+				toolCalls = inline
+			}
+		}
+		if len(toolCalls) == 0 {
 			final := truncateForLog(resp.GetContent(), 512)
 			logAI("assistant response (iteration %d): %s", i+1, final)
 			return resp.GetContent(), nil
@@ -205,7 +240,8 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 					logAI("tool call error: %s %v", def.Name, err)
 				} else {
 					resultContent = toolResultPayload(result)
-					logAI("tool call success: %s result=%s", def.Name, truncateForLog(summarizeToolResult(result), 512))
+					lastToolSummary = summarizeToolResult(result)
+					logAI("tool call success: %s result=%s", def.Name, truncateForLog(lastToolSummary, 512))
 				}
 			}
 
@@ -213,6 +249,7 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 				resultContent = map[string]interface{}{
 					"error": callErr.Error(),
 				}
+				lastToolSummary = callErr.Error()
 			}
 
 			toolMsg, err := s.provider.CreateToolResponse(call.GetID(), resultContent)
@@ -226,11 +263,114 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("exceeded maximum tool iterations without assistant response")
+	logAI("assistant hit tool iteration limit; returning fallback message")
+	if lastToolSummary != "" {
+		message := fmt.Sprintf("I ran multiple tools but still couldn't finish. Most recent result: %s", truncateForLog(lastToolSummary, 256))
+		return message, nil
+	}
+	return "I ran multiple tools but still couldn't finish. Please adjust the request or guide me to a different source.", nil
 }
 
 func logAI(format string, a ...interface{}) {
 	fmt.Fprintf(os.Stderr, "[AI] "+format+"\n", a...)
+}
+
+func profileNameOrDefault(name string) string {
+	if strings.TrimSpace(name) == "" {
+		return "(default)"
+	}
+	return name
+}
+
+type inlineToolCall struct {
+	id   string
+	name string
+	args map[string]interface{}
+}
+
+func (c inlineToolCall) GetName() string {
+	return c.name
+}
+
+func (c inlineToolCall) GetArguments() map[string]interface{} {
+	return c.args
+}
+
+func (c inlineToolCall) GetID() string {
+	return c.id
+}
+
+var (
+	inlineToolPattern     = regexp.MustCompile(`(?s)<tool_call>(.*?)</tool_call>`)
+	inlineToolNamePattern = regexp.MustCompile(`roderik__[a-z0-9_]+`)
+	inlineArgPairPattern  = regexp.MustCompile(`(?s)<arg_key>(.*?)</arg_key>\s*<arg_value>(.*?)</arg_value>`)
+)
+
+func synthesizeInlineToolCalls(content string) []llm.ToolCall {
+	if !strings.Contains(content, "<tool_call>") {
+		return nil
+	}
+
+	matches := inlineToolPattern.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	seenSegments := make(map[string]struct{}, len(matches))
+	var calls []llm.ToolCall
+	for _, match := range matches {
+		segment := match[1]
+		segment = strings.TrimSpace(segment)
+		if segment == "" {
+			continue
+		}
+		if _, ok := seenSegments[segment]; ok {
+			continue
+		}
+		seenSegments[segment] = struct{}{}
+
+		name := inlineToolNamePattern.FindString(segment)
+		if name == "" {
+			// Fallback to first non-tag token
+			lines := strings.Split(segment, "\n")
+			for _, line := range lines {
+				trim := strings.TrimSpace(line)
+				if trim == "" {
+					continue
+				}
+				if strings.HasPrefix(trim, "<") {
+					continue
+				}
+				name = trim
+				break
+			}
+		}
+		if name == "" {
+			continue
+		}
+
+		args := make(map[string]interface{})
+		pairs := inlineArgPairPattern.FindAllStringSubmatch(segment, -1)
+		for _, pair := range pairs {
+			key := strings.TrimSpace(pair[1])
+			val := strings.TrimSpace(pair[2])
+			if key == "" {
+				continue
+			}
+			args[key] = val
+		}
+
+		calls = append(calls, inlineToolCall{
+			id:   fmt.Sprintf("inline-%d", len(calls)+1),
+			name: name,
+			args: args,
+		})
+	}
+
+	if len(calls) == 0 {
+		return nil
+	}
+	return calls
 }
 
 func truncateForLog(s string, limit int) string {

@@ -1,0 +1,13 @@
+{
+  "default": "openai-default",
+  "profiles": {
+    "openai-default": {
+      "provider": "openai",
+      "model": "gpt-5",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "max_tokens": 2048,
+      "system_prompt": "You are Roderik's AI assistant. Prefer browsing tools when information is uncertain."
+    }
+  }
+}

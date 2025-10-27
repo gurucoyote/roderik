@@ -7,4 +7,5 @@ assets
 .env
 kai
 *json
+!docs/ai-profiles.example.json
 .cache

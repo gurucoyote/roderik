@@ -15,26 +15,27 @@
 - Tool implementations live alongside MCP server helpers; refactor shared logic without breaking existing server behavior or MCP stdio mode.
 - Conversation state stays in-memory for now; design `ChatSession` to optionally serialize in future.
 - Profiles likely belong in a per-user config file under `~/.roderik/ai-profiles.json` (exact path TBD) with overrides via flags/env vars.
+- Existing CLI uses `--profile` to pick the Chrome `user_data/` directory; AI chat will rely on a separate model-profile flag (`--model` / `-m`) for LLM configuration to avoid collisions.
 - Respect existing logging/verbosity flags; ensure new command integrates with Cobra pattern and uses stderr for logs.
 - Network access is required for OpenAI APIs—honor environment variables for keys; provide a mock/local provider hook for tests.
 - Dynamic system prompt assembly must be efficient and accurate; avoid excess CDP calls when collecting session context.
 
 ## High-Level Architecture
 - **Chat Command:** Cobra command `ai` (alias `chat`) remains the explicit entrypoint; users invoke `roderik ai <prompt>` (or run `roderik ai` interactively) rather than prefixed REPL shortcuts.
-- **Profile Loader:** Layer that merges profile config + CLI flags + env overrides to produce an `LLMProfile` (OpenAI-compatible provider, model, base URL, API key, tool behavior).
+- **Profile Loader:** Layer that merges profile config + CLI flags + env overrides to produce a `ModelProfile` (OpenAI-compatible provider, model, base URL, API key, tool behavior).
 - **Dynamic Context Builder:** Gathers live session state (current URL, focused element summary, navigation flags) and feeds it into the system prompt template before each LLM call.
 - **History Manager:** Adapt or embed `kai/pkg/history` for message storage/pruning based on window size.
 - **Provider Interface:** Reuse `kai/pkg/llm` abstractions or extract minimal subset into a shared package (e.g. `internal/ai/llm`) tailored to OpenAI-compatible APIs.
 - **Tool Bridge:** Central registry under `internal/ai/tools` exposes tool metadata and handlers; chat and MCP layers consume adapters to sanitize names, list tools, and dispatch calls via shared helpers (wrapping `withPage`, etc.).
 - **Execution Flow:** 
-  1. Resolve profile & load LLM provider.
+  1. Resolve model profile & load LLM provider.
   2. Instantiate tool registry (namespaced, sanitized names).
   3. Assemble base system prompt (static instruction blocks + dynamic context snapshot).
   4. Enter REPL loop: read user input, append to history, call provider with tool list + history window + system prompt.
   5. For each tool call returned, invoke dispatcher, append tool result messages, re-call LLM if needed until assistant text response is ready.
   6. Stream/print assistant text; loop until exit (`/quit`, EOF).
 - **Config Surface (MVP):** 
-  - Flags: `--profile`, `--history-window`, maybe `--system-prompt` (profile selection reserved for future work).
+  - Flags: `--model` (`-m`), `--history-window`, maybe `--system-prompt` (model profile selection avoids clashing with the existing `--profile` flag that controls `user_data/`).
   - Credentials & model: rely on `OPENAI_API_KEY` (env var) and default to `gpt-5-codex` for initial release.
 - Future enhancement: reintroduce `$HOME/.roderik/config.toml` profiles once core chat loop is stable.
 
@@ -49,6 +50,8 @@
 - The MCP server `--log` flag no longer has a short `-l` alias so future AI chat logging options can reuse the short form without conflicts.
 - DuckDuckGo search tool is available for opt-in web lookups via the shared handler registry.
 - `./cache-and-test.sh` passes, confirming the new command wires cleanly into existing tests and Windows cross-build.
+- Inline `<tool_call>` markup from non-OpenAI models is now parsed into structured tool invocations so GLM-style models don't stall after emitting XML-ish text.
+- When the loop hits the tool-iteration ceiling, we surface a user-facing fallback message summarizing the last tool result instead of crashing out of the REPL.
 
 ## System Prompt Outline
 - **Static preamble:** brief description of Roderik’s purpose and workflow, lifted/adapted from existing MCP tool descriptions so the chat view aligns with MCP client expectations (emphasize browsing automation, careful navigation, safety).
@@ -70,12 +73,12 @@
    - Introduce new internal packages for history management, profile handling, provider abstraction, and context building—reusing `kai/pkg/history` & `kai/pkg/llm` (copy or move to shared module while avoiding module import cycles).
    - Define `ai` package types: `Profile`, `ProfileManager`, `ChatSession`, `ContextBuilder` to encapsulate config/history/tool invocation/system prompt assembly.
 4. **Profile Configuration**
-   - Load from `$HOME/.roderik/config.toml`; create with sample OpenAI profile if absent and add gitignore guidance.
-   - Implement loader with precedence: CLI flag → env override → config default.
-   - Validate required fields (`base_url`, `model`, `api_key`); allow optional `system_prompt`.
+   - Load from `$HOME/.roderik/ai-profiles.json`; seed from `docs/ai-profiles.example.json` if absent and add gitignore guidance.
+   - Implement loader with precedence: CLI flag (`--model` / `-m`) → env override → config default.
+   - Validate required fields (`provider`, `model`, and either `api_key` or `api_key_env`); allow optional `system_prompt` and `max_tokens`.
    - Add command `roderik ai profiles list` (optional, nice-to-have) or at least helpful errors.
 5. **Chat Command Skeleton**
-   - Create Cobra command `ai` (alias `chat`) with flags (`--profile`, `--history-window`, verbosity reuse).
+   - Create Cobra command `ai` (alias `chat`) with flags (`--model`, `--history-window`, verbosity reuse).
    - Keep the chat loop scoped to the dedicated Cobra subcommand; document the explicit invocation pattern instead of REPL-prefixed shortcuts.
    - Implement streaming output borrowing Kai’s line-buffered writer; support `/exit` or EOF to leave chat mode.
 6. **Tool Invocation Loop**
