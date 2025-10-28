@@ -17,9 +17,10 @@ func TestEnsurePageEventHandlersRegistersOncePerPage(t *testing.T) {
 
 	pageEventMu.Lock()
 	pageEventPage = nil
+	pageEventID = pageIdentity{}
 	pageEventMu.Unlock()
 
-	page := &rod.Page{}
+	page := &rod.Page{TargetID: "target-1", SessionID: "session-1"}
 	ensurePageEventHandlers(page)
 	ensurePageEventHandlers(page)
 
@@ -27,7 +28,13 @@ func TestEnsurePageEventHandlersRegistersOncePerPage(t *testing.T) {
 		t.Fatalf("expected registerPageEvents to be called once, got %d", registerCalls)
 	}
 
-	ensurePageEventHandlers(&rod.Page{})
+	clone := &rod.Page{TargetID: "target-1", SessionID: "session-1"}
+	ensurePageEventHandlers(clone)
+	if registerCalls != 1 {
+		t.Fatalf("expected identical target/session to reuse listeners, got %d calls", registerCalls)
+	}
+
+	ensurePageEventHandlers(&rod.Page{TargetID: "target-2", SessionID: "session-2"})
 	if registerCalls != 2 {
 		t.Fatalf("expected registerPageEvents to be called for new page, got %d", registerCalls)
 	}
@@ -59,6 +66,7 @@ func TestSetActiveEventLogControlsAppend(t *testing.T) {
 func TestEnsurePageEventHandlersNilSafe(t *testing.T) {
 	pageEventMu.Lock()
 	pageEventPage = nil
+	pageEventID = pageIdentity{}
 	pageEventMu.Unlock()
 
 	ensurePageEventHandlers(nil)

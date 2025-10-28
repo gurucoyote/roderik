@@ -28,7 +28,7 @@ When removing a `Must*`, propagate the resulting error back through the command/
 
 Captured originally in `mcp-navigation.txt` (2025‑10‑07).
 
-- [ ] Guard against duplicate `Page.EachEvent` listeners when `load_url` is called repeatedly from MCP clients.
+- [x] Guard against duplicate `Page.EachEvent` listeners when `load_url` is called repeatedly from MCP clients.
 - [ ] Expose the CLI DOM navigation helpers (`search`, `head`, `next`, `prev`, `elem`, etc.) as MCP tools while holding `pageMu` via `withPage`.
 - [ ] Revisit the `RODERIK_ENABLE_LOAD_URL` gate—consider enabling `load_url` by default (or removing the environment flag entirely) for MCP-first workflows.
 

@@ -12,6 +12,7 @@ import (
 func resetNavGlobals() {
 	pageEventMu.Lock()
 	pageEventPage = nil
+	pageEventID = pageIdentity{}
 	pageEventMu.Unlock()
 
 	elementList = nil

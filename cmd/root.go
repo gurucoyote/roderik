@@ -598,9 +598,15 @@ func (f NetworkLogFilter) matches(entry *NetworkLogEntry) bool {
 	return true
 }
 
+type pageIdentity struct {
+	target  proto.TargetTargetID
+	session proto.TargetSessionID
+}
+
 var (
 	pageEventMu   sync.Mutex
 	pageEventPage *rod.Page
+	pageEventID   pageIdentity
 )
 
 var (
@@ -820,14 +826,23 @@ func ensurePageEventHandlers(p *rod.Page) {
 	if p == nil {
 		return
 	}
+
+	id := pageIdentity{target: p.TargetID, session: p.SessionID}
+
 	pageEventMu.Lock()
 	defer pageEventMu.Unlock()
 	if pageEventPage == p {
 		return
 	}
 
+	if (id != pageIdentity{}) && id == pageEventID {
+		pageEventPage = p
+		return
+	}
+
 	registerPageEvents(p)
 	pageEventPage = p
+	pageEventID = id
 }
 
 func newPageForBrowser(b *rod.Browser) (*rod.Page, error) {
