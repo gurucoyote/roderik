@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,10 +14,12 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -57,6 +60,8 @@ var (
 	logSetupErr    error
 	logPipeWriters []*os.File
 )
+
+var netActivityEnabled atomic.Bool
 
 var (
 	originalStdout = os.Stdout
@@ -182,23 +187,414 @@ func StdinIsTerminal() bool {
 	return isTerminalFile(os.Stdin)
 }
 
-type EventLog struct {
-	mu   sync.Mutex
-	logs []string
+type NetworkResponseInfo struct {
+	Status            int
+	StatusText        string
+	MIMEType          string
+	Headers           map[string]string
+	EncodedDataLength float64
+	FromDiskCache     bool
+	FromPrefetchCache bool
+	ResponseTimestamp time.Time
 }
 
-func (l *EventLog) Add(log string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.logs = append(l.logs, log)
+type NetworkFinishedInfo struct {
+	EncodedDataLength float64
+	FinishedTimestamp time.Time
 }
 
-func (l *EventLog) Display() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	for _, log := range l.logs {
-		fmt.Println(log)
+type NetworkFailureInfo struct {
+	ErrorText        string
+	Canceled         bool
+	ResourceType     proto.NetworkResourceType
+	BlockedReason    proto.NetworkBlockedReason
+	FailureTimestamp time.Time
+}
+
+type NetworkBody struct {
+	Data         []byte
+	RetrievedAt  time.Time
+	FromStream   bool
+	OriginalSize int
+}
+
+type NetworkLogEntry struct {
+	RequestID        string
+	ProtoRequestID   proto.NetworkRequestID
+	URL              string
+	Method           string
+	ResourceType     proto.NetworkResourceType
+	DocumentURL      string
+	FrameID          proto.PageFrameID
+	LoaderID         proto.NetworkLoaderID
+	InitiatorType    string
+	RequestHeaders   map[string]string
+	RequestTimestamp time.Time
+	Response         *NetworkResponseInfo
+	Finished         *NetworkFinishedInfo
+	Failure          *NetworkFailureInfo
+	Body             *NetworkBody
+}
+
+type NetworkEventLog struct {
+	mu       sync.Mutex
+	messages []string
+	entries  map[string]*NetworkLogEntry
+	order    []string
+}
+
+type NetworkLogFilter struct {
+	MIMESubstrings []string
+	Suffixes       []string
+	StatusCodes    []int
+	TextContains   []string
+	Methods        []string
+	Domains        []string
+	ResourceTypes  []proto.NetworkResourceType
+}
+
+func newNetworkEventLog() *NetworkEventLog {
+	return &NetworkEventLog{
+		entries: make(map[string]*NetworkLogEntry),
 	}
+}
+
+func cloneHeaders(headers proto.NetworkHeaders) map[string]string {
+	if headers == nil {
+		return nil
+	}
+	cloned := make(map[string]string, len(headers))
+	for k, v := range headers {
+		cloned[k] = v.String()
+	}
+	return cloned
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	cloned := make(map[string]string, len(src))
+	for k, v := range src {
+		cloned[k] = v
+	}
+	return cloned
+}
+
+func (r *NetworkResponseInfo) clone() *NetworkResponseInfo {
+	if r == nil {
+		return nil
+	}
+	cpy := *r
+	cpy.Headers = cloneStringMap(r.Headers)
+	return &cpy
+}
+
+func (f *NetworkFinishedInfo) clone() *NetworkFinishedInfo {
+	if f == nil {
+		return nil
+	}
+	cpy := *f
+	return &cpy
+}
+
+func (f *NetworkFailureInfo) clone() *NetworkFailureInfo {
+	if f == nil {
+		return nil
+	}
+	cpy := *f
+	return &cpy
+}
+
+func (b *NetworkBody) clone() *NetworkBody {
+	if b == nil {
+		return nil
+	}
+	cpy := *b
+	if b.Data != nil {
+		cpy.Data = append([]byte(nil), b.Data...)
+	}
+	return &cpy
+}
+
+func (e *NetworkLogEntry) clone() *NetworkLogEntry {
+	if e == nil {
+		return nil
+	}
+	cpy := *e
+	cpy.RequestHeaders = cloneStringMap(e.RequestHeaders)
+	cpy.Response = e.Response.clone()
+	cpy.Finished = e.Finished.clone()
+	cpy.Failure = e.Failure.clone()
+	cpy.Body = e.Body.clone()
+	return &cpy
+}
+
+func (l *NetworkEventLog) AddMessage(msg string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.messages = append(l.messages, msg)
+}
+
+func (l *NetworkEventLog) recordEntry(reqID proto.NetworkRequestID) *NetworkLogEntry {
+	key := string(reqID)
+	entry, ok := l.entries[key]
+	if !ok {
+		entry = &NetworkLogEntry{RequestID: key, ProtoRequestID: reqID}
+		l.entries[key] = entry
+		l.order = append(l.order, key)
+	}
+	if entry.ProtoRequestID == "" {
+		entry.ProtoRequestID = reqID
+	}
+	return entry
+}
+
+func (l *NetworkEventLog) RecordRequest(e *proto.NetworkRequestWillBeSent) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry := l.recordEntry(e.RequestID)
+	entry.URL = e.Request.URL
+	entry.Method = e.Request.Method
+	entry.ResourceType = e.Type
+	entry.DocumentURL = e.DocumentURL
+	entry.FrameID = e.FrameID
+	entry.LoaderID = e.LoaderID
+	if e.Initiator != nil {
+		entry.InitiatorType = string(e.Initiator.Type)
+	}
+	entry.RequestHeaders = cloneHeaders(e.Request.Headers)
+	entry.RequestTimestamp = time.Now()
+}
+
+func (l *NetworkEventLog) RecordResponse(e *proto.NetworkResponseReceived) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry := l.recordEntry(e.RequestID)
+	entry.ResourceType = e.Type
+	entry.Response = &NetworkResponseInfo{
+		Status:            int(e.Response.Status),
+		StatusText:        e.Response.StatusText,
+		MIMEType:          e.Response.MIMEType,
+		Headers:           cloneHeaders(e.Response.Headers),
+		EncodedDataLength: e.Response.EncodedDataLength,
+		FromDiskCache:     e.Response.FromDiskCache,
+		FromPrefetchCache: e.Response.FromPrefetchCache,
+		ResponseTimestamp: time.Now(),
+	}
+}
+
+func (l *NetworkEventLog) RecordFinished(e *proto.NetworkLoadingFinished) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry := l.recordEntry(e.RequestID)
+	entry.Finished = &NetworkFinishedInfo{
+		EncodedDataLength: e.EncodedDataLength,
+		FinishedTimestamp: time.Now(),
+	}
+}
+
+func (l *NetworkEventLog) RecordFailure(e *proto.NetworkLoadingFailed) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry := l.recordEntry(e.RequestID)
+	entry.ResourceType = e.Type
+	entry.Failure = &NetworkFailureInfo{
+		ErrorText:        e.ErrorText,
+		Canceled:         e.Canceled,
+		ResourceType:     e.Type,
+		BlockedReason:    e.BlockedReason,
+		FailureTimestamp: time.Now(),
+	}
+}
+
+func (l *NetworkEventLog) StoreBody(reqID proto.NetworkRequestID, data []byte, fromStream bool, originalSize int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry := l.recordEntry(reqID)
+	bodyCopy := append([]byte(nil), data...)
+	entry.Body = &NetworkBody{
+		Data:         bodyCopy,
+		RetrievedAt:  time.Now(),
+		FromStream:   fromStream,
+		OriginalSize: originalSize,
+	}
+}
+
+func (l *NetworkEventLog) EntryByID(id string) (*NetworkLogEntry, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry, ok := l.entries[id]
+	if !ok {
+		return nil, false
+	}
+	return entry.clone(), true
+}
+
+func (l *NetworkEventLog) Entries() []*NetworkLogEntry {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	results := make([]*NetworkLogEntry, 0, len(l.order))
+	for _, id := range l.order {
+		if entry, ok := l.entries[id]; ok {
+			results = append(results, entry.clone())
+		}
+	}
+	return results
+}
+
+func (l *NetworkEventLog) Messages() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	msgs := make([]string, len(l.messages))
+	copy(msgs, l.messages)
+	return msgs
+}
+
+func (l *NetworkEventLog) FilterEntries(filter NetworkLogFilter) []*NetworkLogEntry {
+	entries := l.Entries()
+	if isEmptyFilter(filter) {
+		return entries
+	}
+	results := make([]*NetworkLogEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if filter.matches(entry) {
+			results = append(results, entry)
+		}
+	}
+	return results
+}
+
+func isEmptyFilter(f NetworkLogFilter) bool {
+	return len(f.MIMESubstrings) == 0 && len(f.Suffixes) == 0 && len(f.StatusCodes) == 0 &&
+		len(f.TextContains) == 0 && len(f.Methods) == 0 && len(f.Domains) == 0 && len(f.ResourceTypes) == 0
+}
+
+func normalizeStrings(values []string) []string {
+	res := make([]string, 0, len(values))
+	for _, v := range values {
+		trimmed := strings.TrimSpace(strings.ToLower(v))
+		if trimmed != "" {
+			res = append(res, trimmed)
+		}
+	}
+	return res
+}
+
+func (f NetworkLogFilter) matches(entry *NetworkLogEntry) bool {
+	if len(f.Methods) > 0 {
+		method := strings.ToLower(entry.Method)
+		match := false
+		for _, m := range f.Methods {
+			if method == strings.ToLower(m) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return false
+		}
+	}
+
+	if len(f.ResourceTypes) > 0 {
+		match := false
+		for _, rt := range f.ResourceTypes {
+			if entry.ResourceType == rt {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return false
+		}
+	}
+
+	if len(f.MIMESubstrings) > 0 {
+		if entry.Response == nil {
+			return false
+		}
+		mime := strings.ToLower(entry.Response.MIMEType)
+		match := false
+		for _, substr := range f.MIMESubstrings {
+			if strings.Contains(mime, strings.ToLower(substr)) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return false
+		}
+	}
+
+	if len(f.StatusCodes) > 0 {
+		if entry.Response == nil {
+			return false
+		}
+		match := false
+		for _, code := range f.StatusCodes {
+			if entry.Response.Status == code {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return false
+		}
+	}
+
+	if len(f.Domains) > 0 || len(f.Suffixes) > 0 || len(f.TextContains) > 0 {
+		u, err := url.Parse(entry.URL)
+		var host, pathStr string
+		if err == nil {
+			host = strings.ToLower(u.Host)
+			pathStr = u.Path
+		} else {
+			pathStr = entry.URL
+		}
+		if len(f.Domains) > 0 {
+			match := false
+			for _, d := range f.Domains {
+				if strings.Contains(host, strings.ToLower(d)) {
+					match = true
+					break
+				}
+			}
+			if !match {
+				return false
+			}
+		}
+		if len(f.Suffixes) > 0 {
+			name := strings.ToLower(path.Base(pathStr))
+			match := false
+			for _, suf := range f.Suffixes {
+				if strings.HasSuffix(name, strings.ToLower(suf)) {
+					match = true
+					break
+				}
+			}
+			if !match {
+				return false
+			}
+		}
+		if len(f.TextContains) > 0 {
+			content := strings.ToLower(entry.URL)
+			matchAll := true
+			for _, txt := range f.TextContains {
+				if !strings.Contains(content, strings.ToLower(txt)) {
+					matchAll = false
+					break
+				}
+			}
+			if !matchAll {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 var (
@@ -208,7 +604,7 @@ var (
 
 var (
 	eventLogMu     sync.RWMutex
-	activeEventLog *EventLog
+	activeEventLog = newNetworkEventLog()
 )
 
 var (
@@ -229,18 +625,108 @@ var (
 	pendingRootTarget           string
 )
 
-func setActiveEventLog(log *EventLog) {
+func setActiveEventLog(log *NetworkEventLog) {
 	eventLogMu.Lock()
 	activeEventLog = log
 	eventLogMu.Unlock()
 }
 
 func appendEventLog(msg string) {
+	if log := getActiveEventLog(); log != nil {
+		log.AddMessage(msg)
+	}
+}
+
+func getActiveEventLog() *NetworkEventLog {
 	eventLogMu.RLock()
 	defer eventLogMu.RUnlock()
-	if activeEventLog != nil {
-		activeEventLog.Add(msg)
+	return activeEventLog
+}
+
+func setNetworkActivityEnabled(enabled bool) bool {
+	prev := netActivityEnabled.Swap(enabled)
+	ShowNetActivity = enabled
+	return prev != enabled
+}
+
+func syncNetworkActivityFlag() {
+	setNetworkActivityEnabled(ShowNetActivity)
+}
+
+func isNetworkActivityEnabled() bool {
+	return netActivityEnabled.Load()
+}
+
+func recordNetworkRequest(e *proto.NetworkRequestWillBeSent) {
+	if log := getActiveEventLog(); log != nil {
+		log.RecordRequest(e)
 	}
+}
+
+func recordNetworkResponse(e *proto.NetworkResponseReceived) {
+	if log := getActiveEventLog(); log != nil {
+		log.RecordResponse(e)
+	}
+}
+
+func recordNetworkFinished(e *proto.NetworkLoadingFinished) {
+	if log := getActiveEventLog(); log != nil {
+		log.RecordFinished(e)
+	}
+}
+
+func recordNetworkFailed(e *proto.NetworkLoadingFailed) {
+	if log := getActiveEventLog(); log != nil {
+		log.RecordFailure(e)
+	}
+}
+
+func retrieveNetworkBody(page *rod.Page, entry *NetworkLogEntry) ([]byte, error) {
+	if entry == nil {
+		return nil, fmt.Errorf("entry is nil")
+	}
+	if entry.Body != nil {
+		return append([]byte(nil), entry.Body.Data...), nil
+	}
+	if page == nil {
+		return nil, fmt.Errorf("no page loaded to retrieve body")
+	}
+	if entry.ProtoRequestID == "" {
+		return nil, fmt.Errorf("entry missing request id")
+	}
+	res, err := proto.NetworkGetResponseBody{RequestID: entry.ProtoRequestID}.Call(page)
+	if err != nil {
+		return nil, fmt.Errorf("get response body: %w", err)
+	}
+	body := []byte(res.Body)
+	if res.Base64Encoded {
+		decoded, err := base64.StdEncoding.DecodeString(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("decode base64 body: %w", err)
+		}
+		body = decoded
+	}
+	if log := getActiveEventLog(); log != nil {
+		log.StoreBody(entry.ProtoRequestID, body, false, len(body))
+		if updated, ok := log.EntryByID(entry.RequestID); ok {
+			entry.Body = updated.Body
+		} else {
+			entry.Body = &NetworkBody{
+				Data:         append([]byte(nil), body...),
+				RetrievedAt:  time.Now(),
+				FromStream:   false,
+				OriginalSize: len(body),
+			}
+		}
+	} else {
+		entry.Body = &NetworkBody{
+			Data:         append([]byte(nil), body...),
+			RetrievedAt:  time.Now(),
+			FromStream:   false,
+			OriginalSize: len(body),
+		}
+	}
+	return append([]byte(nil), body...), nil
 }
 
 var Browser *rod.Browser
@@ -256,17 +742,25 @@ var registerPageEvents = func(p *rod.Page) {
 	p.EnableDomain(proto.NetworkEnable{})
 	go p.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
 		msg := fmt.Sprintf("Request sent: %s", e.Request.URL)
-		if ShowNetActivity {
+		if isNetworkActivityEnabled() {
 			fmt.Fprintln(os.Stderr, msg)
 		}
+		recordNetworkRequest(e)
 		appendEventLog(msg)
 	})()
 	go p.EachEvent(func(e *proto.NetworkResponseReceived) {
 		msg := fmt.Sprintf("Response received: %s Status: %d", e.Response.URL, e.Response.Status)
-		if ShowNetActivity {
+		if isNetworkActivityEnabled() {
 			fmt.Fprintln(os.Stderr, msg)
 		}
+		recordNetworkResponse(e)
 		appendEventLog(msg)
+	})()
+	go p.EachEvent(func(e *proto.NetworkLoadingFinished) {
+		recordNetworkFinished(e)
+	})()
+	go p.EachEvent(func(e *proto.NetworkLoadingFailed) {
+		recordNetworkFailed(e)
 	})()
 	go p.EachEvent(func(e *proto.PageFrameNavigated) {
 		fmt.Fprintln(os.Stderr, "Navigated to:", e.Frame.URL)
@@ -355,6 +849,7 @@ var RootCmd = &cobra.Command{
 	Args:  cobra.ArbitraryArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		args = extractTargetFromProfileFlag(cmd, args)
+		syncNetworkActivityFlag()
 		if err := ensureLoggingSetup(); err != nil {
 			browserInitErr = err
 			Page = nil
@@ -481,8 +976,8 @@ var RootCmd = &cobra.Command{
 }
 
 func PrepareBrowser() (*rod.Browser, error) {
-	baseUserDataDir := filepath.Join(".", "user_data")
-	if err := os.MkdirAll(baseUserDataDir, 0755); err != nil {
+	baseUserDataDir, err := ensureUserDataRoot()
+	if err != nil {
 		return nil, err
 	}
 
@@ -604,7 +1099,7 @@ func isValidURL(str string) bool {
 
 func LoadURL(targetURL string) (*rod.Page, error) {
 	// setup network aktivity logging
-	eventLog := &EventLog{}
+	eventLog := newNetworkEventLog()
 	setActiveEventLog(eventLog)
 	ensurePageEventHandlers(Page)
 

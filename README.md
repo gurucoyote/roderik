@@ -36,6 +36,12 @@ Recent reliability tweaks:
 - Heading discovery (`head`, initial load) now evaluates the DOM through an inline function, preventing Rod's cached helper from occasionally disappearing and halting navigation.
 - Multiple `roderik` instances can now run side by side by falling back to disposable Chrome user-data profiles when the shared profile is locked, avoiding singleton panics.
 
+## Data Directories
+- Persistent state now defaults to the system config directory (e.g. `$XDG_CONFIG_HOME/roderik` on Linux/macOS, `%AppData%\Roaming\roderik` on Windows) or `~/.roderik` when the config path is unavailable.
+- Browser profiles live under `<base>/user_data`, temporary fallbacks are created inside the same directory, and network captures default to `<base>/user_data/downloads`.
+- MCP logs are written to `<base>/logs/roderik-mcp.log` unless you override the path via `--log`.
+- Override the defaults with `RODERIK_HOME` (sets the base), or the more specific `RODERIK_USER_DATA_DIR`, `RODERIK_LOG_DIR`, and `RODERIK_DOWNLOAD_DIR` environment variables when you need per-project storage.
+
 ## MCP Server Overview
 
 Roderik ships with an MCP server (`go run ./cmd/mcp.go`) that mirrors the CLI commands so agents can drive a shared browser session over stdio. Recent behaviour to keep in mind when wiring a client:

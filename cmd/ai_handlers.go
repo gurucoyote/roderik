@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"roderik/browser"
 	duckduck "roderik/duckduck"
 	aitools "roderik/internal/ai/tools"
+	"roderik/internal/appdirs"
 )
 
 var registerHandlersOnce sync.Once
@@ -53,6 +55,9 @@ func registerHandlers() {
 		aitools.RegisterHandler("describe", describeHandler)
 		aitools.RegisterHandler("xpath", xpathHandler)
 		aitools.RegisterHandler("duck", duckHandler)
+		aitools.RegisterHandler("network_list", networkListHandler)
+		aitools.RegisterHandler("network_save", networkSaveHandler)
+		aitools.RegisterHandler("network_set_logging", networkSetLoggingHandler)
 		// Additional tool handlers will be registered here as they migrate.
 	})
 }
@@ -766,6 +771,280 @@ func xpathHandler(ctx context.Context, args map[string]interface{}) (aitools.Res
 	})
 }
 
+type networkEntrySummary struct {
+	RequestID        string `json:"request_id"`
+	URL              string `json:"url"`
+	Method           string `json:"method"`
+	Status           *int   `json:"status,omitempty"`
+	MIMEType         string `json:"mime_type,omitempty"`
+	ResourceType     string `json:"resource_type,omitempty"`
+	EncodedBytes     *int   `json:"encoded_bytes,omitempty"`
+	FinishedBytes    *int   `json:"finished_bytes,omitempty"`
+	Failure          string `json:"failure,omitempty"`
+	Canceled         bool   `json:"canceled,omitempty"`
+	HasBody          bool   `json:"has_body"`
+	Retrieved        bool   `json:"retrieved,omitempty"`
+	RequestTimestamp string `json:"request_time,omitempty"`
+	ResponseTime     string `json:"response_time,omitempty"`
+}
+
+func networkListHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
+	toolDebug("[TOOLS] network_list CALLED args=%#v", args)
+
+	log := getActiveEventLog()
+	if log == nil {
+		return aitools.Result{}, fmt.Errorf("network_list: no active network log")
+	}
+
+	filter, err := networkFilterFromArgs(args)
+	if err != nil {
+		return aitools.Result{}, err
+	}
+
+	entries := log.FilterEntries(filter)
+	summaries := make([]networkEntrySummary, 0, len(entries))
+	for _, entry := range entries {
+		summaries = append(summaries, summarizeNetworkEntry(entry))
+	}
+
+	payload, err := json.MarshalIndent(summaries, "", "  ")
+	if err != nil {
+		return aitools.Result{}, fmt.Errorf("network_list: marshal summaries: %w", err)
+	}
+
+	toolDebug("[TOOLS] network_list RESULT count=%d", len(summaries))
+	return aitools.Result{Text: string(payload)}, nil
+}
+
+func networkSaveHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
+	toolDebug("[TOOLS] network_save CALLED args=%#v", args)
+
+	reqID := strings.TrimSpace(mcp.ExtractString(args, "request_id"))
+	if reqID == "" {
+		return aitools.Result{}, fmt.Errorf("network_save: request_id is required")
+	}
+	saveDir := strings.TrimSpace(mcp.ExtractString(args, "save_dir"))
+	returnMode := strings.TrimSpace(strings.ToLower(mcp.ExtractString(args, "return")))
+	if returnMode == "" {
+		returnMode = "binary"
+	}
+	filenameOverride := strings.TrimSpace(mcp.ExtractString(args, "filename"))
+
+	log := getActiveEventLog()
+	if log == nil {
+		return aitools.Result{}, fmt.Errorf("network_save: no active network log")
+	}
+
+	entry, ok := log.EntryByID(reqID)
+	if !ok {
+		return aitools.Result{}, fmt.Errorf("network_save: request %s not found", reqID)
+	}
+
+	data, err := withPage(func() ([]byte, error) {
+		if Page == nil {
+			return nil, fmt.Errorf("network_save: no page loaded – call load_url first")
+		}
+		bytes, err := retrieveNetworkBody(Page, entry)
+		if err != nil {
+			return nil, err
+		}
+		return bytes, nil
+	})
+	if err != nil {
+		return aitools.Result{}, err
+	}
+
+	updatedEntry, ok := log.EntryByID(reqID)
+	if ok {
+		entry = updatedEntry
+	}
+
+	mimeType := ""
+	if entry.Response != nil {
+		mimeType = entry.Response.MIMEType
+	}
+	baseName := suggestFilename(entry, 0)
+	if filenameOverride != "" {
+		baseName = sanitizeFilename(filenameOverride)
+	}
+
+	switch returnMode {
+	case "file":
+		if saveDir == "" {
+			saveDir = defaultDownloadsDir()
+		}
+		if err := appdirs.EnsureDir(saveDir); err != nil {
+			return aitools.Result{}, fmt.Errorf("network_save: create directory: %w", err)
+		}
+		name := ensureUniqueFilename(saveDir, baseName, make(map[string]int))
+		fullPath := filepath.Join(saveDir, name)
+		if err := os.WriteFile(fullPath, data, 0o644); err != nil {
+			return aitools.Result{}, fmt.Errorf("network_save: write file: %w", err)
+		}
+		toolDebug("[TOOLS] network_save saved bytes=%d path=%s", len(data), fullPath)
+		return aitools.Result{
+			Text:        fmt.Sprintf("saved %d bytes to %s", len(data), fullPath),
+			FilePath:    fullPath,
+			ContentType: mimeType,
+		}, nil
+	case "binary":
+		fallthrough
+	default:
+		toolDebug("[TOOLS] network_save returning binary size=%d", len(data))
+		return aitools.Result{
+			Text:        fmt.Sprintf("retrieved %d bytes for %s", len(data), entry.URL),
+			Binary:      data,
+			ContentType: mimeType,
+		}, nil
+	}
+}
+
+func networkSetLoggingHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
+	toolDebug("[TOOLS] network_set_logging CALLED args=%#v", args)
+
+	stateChanged := false
+	if raw, ok := args["enabled"]; ok {
+		enabled, okBool := toBool(raw)
+		if !okBool {
+			return aitools.Result{}, fmt.Errorf("network_set_logging: enabled must be boolean")
+		}
+		if setNetworkActivityEnabled(enabled) {
+			stateChanged = true
+		}
+	}
+
+	current := isNetworkActivityEnabled()
+	msg := fmt.Sprintf("network logging enabled: %t", current)
+	if stateChanged {
+		toolDebug("[TOOLS] network_set_logging updated state=%t", current)
+	} else {
+		toolDebug("[TOOLS] network_set_logging status=%t", current)
+	}
+	return aitools.Result{Text: msg}, nil
+}
+
+func summarizeNetworkEntry(entry *NetworkLogEntry) networkEntrySummary {
+	summary := networkEntrySummary{
+		RequestID:    entry.RequestID,
+		URL:          entry.URL,
+		Method:       entry.Method,
+		ResourceType: string(entry.ResourceType),
+		HasBody:      entry.Response != nil,
+	}
+	if !entry.RequestTimestamp.IsZero() {
+		summary.RequestTimestamp = entry.RequestTimestamp.Format(time.RFC3339)
+	}
+	if entry.Response != nil {
+		status := entry.Response.Status
+		summary.Status = &status
+		summary.MIMEType = entry.Response.MIMEType
+		if entry.Response.EncodedDataLength > 0 {
+			encoded := int(entry.Response.EncodedDataLength)
+			summary.EncodedBytes = &encoded
+		}
+		if !entry.Response.ResponseTimestamp.IsZero() {
+			summary.ResponseTime = entry.Response.ResponseTimestamp.Format(time.RFC3339)
+		}
+	}
+	if entry.Finished != nil && entry.Finished.EncodedDataLength > 0 {
+		finished := int(entry.Finished.EncodedDataLength)
+		summary.FinishedBytes = &finished
+	}
+	if entry.Failure != nil {
+		summary.Failure = entry.Failure.ErrorText
+		summary.Canceled = entry.Failure.Canceled
+	}
+	if entry.Body != nil {
+		summary.HasBody = true
+		summary.Retrieved = true
+	}
+	return summary
+}
+
+func networkFilterFromArgs(args map[string]interface{}) (NetworkLogFilter, error) {
+	filter := NetworkLogFilter{}
+	filter.MIMESubstrings = normalizeStrings(extractStringSlice(args, "mime"))
+	filter.Suffixes = normalizeStrings(extractStringSlice(args, "suffix"))
+	filter.TextContains = normalizeStrings(extractStringSlice(args, "contains"))
+	filter.Methods = normalizeStrings(extractStringSlice(args, "method"))
+	filter.Domains = normalizeStrings(extractStringSlice(args, "domain"))
+	filter.StatusCodes = extractIntSlice(args, "status")
+	if types := extractStringSlice(args, "type"); len(types) > 0 {
+		rts, err := parseResourceTypes(types)
+		if err != nil {
+			return NetworkLogFilter{}, err
+		}
+		filter.ResourceTypes = rts
+	}
+	return filter, nil
+}
+
+func extractStringSlice(args map[string]interface{}, key string) []string {
+	if args == nil {
+		return nil
+	}
+	val, ok := args[key]
+	if !ok {
+		return nil
+	}
+	switch v := val.(type) {
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return nil
+		}
+		parts := strings.Split(v, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if s := strings.TrimSpace(p); s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	case []string:
+		return v
+	case []interface{}:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			switch sv := item.(type) {
+			case string:
+				if strings.TrimSpace(sv) != "" {
+					out = append(out, sv)
+				}
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func extractIntSlice(args map[string]interface{}, key string) []int {
+	if args == nil {
+		return nil
+	}
+	val, ok := args[key]
+	if !ok {
+		return nil
+	}
+	switch v := val.(type) {
+	case []int:
+		return v
+	case []interface{}:
+		out := make([]int, 0, len(v))
+		for _, item := range v {
+			if n, ok := toInt(item); ok {
+				out = append(out, n)
+			}
+		}
+		return out
+	default:
+		if n, ok := toInt(v); ok {
+			return []int{n}
+		}
+		return nil
+	}
+}
+
 func toInt(v interface{}) (int, bool) {
 	switch val := v.(type) {
 	case int:
@@ -786,4 +1065,30 @@ func toInt(v interface{}) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+func toBool(v interface{}) (bool, bool) {
+	switch val := v.(type) {
+	case bool:
+		return val, true
+	case string:
+		s := strings.TrimSpace(strings.ToLower(val))
+		switch s {
+		case "true", "1", "yes", "on", "enabled":
+			return true, true
+		case "false", "0", "no", "off", "disabled":
+			return false, true
+		}
+	case float64:
+		return val != 0, true
+	case float32:
+		return val != 0, true
+	case int:
+		return val != 0, true
+	case int32:
+		return val != 0, true
+	case int64:
+		return val != 0, true
+	}
+	return false, false
 }

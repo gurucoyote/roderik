@@ -34,8 +34,11 @@ func TestEnsurePageEventHandlersRegistersOncePerPage(t *testing.T) {
 }
 
 func TestSetActiveEventLogControlsAppend(t *testing.T) {
-	logA := &EventLog{}
-	logB := &EventLog{}
+	original := getActiveEventLog()
+	defer setActiveEventLog(original)
+
+	logA := newNetworkEventLog()
+	logB := newNetworkEventLog()
 
 	setActiveEventLog(logA)
 	appendEventLog("first")
@@ -43,11 +46,13 @@ func TestSetActiveEventLogControlsAppend(t *testing.T) {
 	setActiveEventLog(logB)
 	appendEventLog("second")
 
-	if len(logA.logs) != 1 || logA.logs[0] != "first" {
-		t.Fatalf("logA expected single entry 'first', got %#v", logA.logs)
+	msgsA := logA.Messages()
+	if len(msgsA) != 1 || msgsA[0] != "first" {
+		t.Fatalf("logA expected single entry 'first', got %#v", msgsA)
 	}
-	if len(logB.logs) != 1 || logB.logs[0] != "second" {
-		t.Fatalf("logB expected single entry 'second', got %#v", logB.logs)
+	msgsB := logB.Messages()
+	if len(msgsB) != 1 || msgsB[0] != "second" {
+		t.Fatalf("logB expected single entry 'second', got %#v", msgsB)
 	}
 }
 
@@ -62,5 +67,23 @@ func TestEnsurePageEventHandlersNilSafe(t *testing.T) {
 	defer pageEventMu.Unlock()
 	if pageEventPage != nil {
 		t.Fatalf("expected pageEventPage to remain nil when ensurePageEventHandlers called with nil")
+	}
+}
+
+func TestSetNetworkActivityEnabled(t *testing.T) {
+	original := isNetworkActivityEnabled()
+	defer setNetworkActivityEnabled(original)
+
+	changed := setNetworkActivityEnabled(!original)
+	current := isNetworkActivityEnabled()
+	if current == original {
+		t.Fatalf("expected network activity state to flip from %t", original)
+	}
+	if !changed {
+		t.Fatalf("expected change flag when toggling state")
+	}
+	unchanged := setNetworkActivityEnabled(current)
+	if unchanged {
+		t.Fatalf("expected change flag to be false when setting same state")
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -16,12 +17,29 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 	aitools "roderik/internal/ai/tools"
+	"roderik/internal/appdirs"
 )
 
 // path to the MCP debug log file, override with --log
 var mcpLogPath string
 
 const inlineBinaryLimit = 512 * 1024
+
+func defaultMCPLogPath() string {
+	dir, err := appdirs.LogsDir()
+	if err != nil {
+		return "roderik-mcp.log"
+	}
+	return filepath.Join(dir, "roderik-mcp.log")
+}
+
+func ensureLogDir(path string) error {
+	dir := filepath.Dir(path)
+	if dir == "." || strings.TrimSpace(dir) == "" {
+		return nil
+	}
+	return appdirs.EnsureDir(dir)
+}
 
 // LoadURLArgs is the JSON schema for the load_url tool.
 type LoadURLArgs struct {
@@ -40,7 +58,7 @@ var mcpCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(mcpCmd)
-	mcpCmd.Flags().StringVar(&mcpLogPath, "log", "roderik-mcp.log", "path to the MCP debug log file")
+	mcpCmd.Flags().StringVar(&mcpLogPath, "log", defaultMCPLogPath(), "path to the MCP debug log file")
 
 	// ensure cobra’s own help/errors go to stderr
 	mcpCmd.SetOut(os.Stderr)
@@ -77,6 +95,10 @@ func runMCP(cmd *cobra.Command, args []string) {
 	log.SetOutput(os.Stderr)
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.Printf("[MCP] starting server name=%q version=%q", "roderik", "1.0.0")
+
+	if err := ensureLogDir(mcpLogPath); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cannot prepare log directory for %q: %v\n", mcpLogPath, err)
+	}
 
 	f, err := os.OpenFile(mcpLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -218,6 +240,82 @@ func runMCP(cmd *cobra.Command, args []string) {
 				return nil, err
 			}
 			return resultToMCP(res)
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"network_list",
+			mcp.WithDescription("List captured network activity entries with optional filters."),
+			mcp.WithArray("mime", mcp.Items(map[string]interface{}{"type": "string"})),
+			mcp.WithArray("suffix", mcp.Items(map[string]interface{}{"type": "string"})),
+			mcp.WithArray("status", mcp.Items(map[string]interface{}{"type": "integer"})),
+			mcp.WithArray("contains", mcp.Items(map[string]interface{}{"type": "string"})),
+			mcp.WithArray("method", mcp.Items(map[string]interface{}{"type": "string"})),
+			mcp.WithArray("domain", mcp.Items(map[string]interface{}{"type": "string"})),
+			mcp.WithArray("type", mcp.Items(map[string]interface{}{"type": "string"})),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL network_list CALLED args=%#v", req.Params.Arguments)
+			res, err := aitools.Call(ctx, "network_list", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			out, err := resultToMCP(res)
+			if err != nil {
+				return nil, err
+			}
+			log.Printf("[MCP] TOOL network_list RESULT length=%d", len(res.Text))
+			return out, nil
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"network_save",
+			mcp.WithDescription("Retrieve or persist the response body for a captured network request."),
+			mcp.WithString("request_id", mcp.Required(), mcp.Description("request identifier returned by network_list")),
+			mcp.WithString("return", mcp.Description("delivery mode: binary (default) or file"), mcp.Enum("binary", "file"), mcp.DefaultString("binary")),
+			mcp.WithString("save_dir", mcp.Description("optional directory to write the file when return=file")),
+			mcp.WithString("filename", mcp.Description("optional filename override when saving to disk")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL network_save CALLED args=%#v", req.Params.Arguments)
+			res, err := aitools.Call(ctx, "network_save", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			out, err := resultToMCP(res)
+			if err != nil {
+				return nil, err
+			}
+			if res.Binary != nil {
+				log.Printf("[MCP] TOOL network_save RESULT binary length=%d", len(res.Binary))
+			} else {
+				log.Printf("[MCP] TOOL network_save RESULT %q", res.Text)
+			}
+			return out, nil
+		},
+	)
+
+	s.AddTool(
+		mcp.NewTool(
+			"network_set_logging",
+			mcp.WithDescription("Enable, disable, or query network activity logging without restarting Roderik."),
+			mcp.WithBoolean("enabled", mcp.Description("optional flag; when provided sets logging state to the given value")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL network_set_logging CALLED args=%#v", req.Params.Arguments)
+			res, err := aitools.Call(ctx, "network_set_logging", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			out, err := resultToMCP(res)
+			if err != nil {
+				return nil, err
+			}
+			log.Printf("[MCP] TOOL network_set_logging RESULT %q", res.Text)
+			return out, nil
 		},
 	)
 
