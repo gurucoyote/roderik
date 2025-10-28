@@ -10,3 +10,4 @@ kai
 !docs/ai-profiles.example.json
 .cache
 roderik*
+.modcache/
