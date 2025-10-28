@@ -42,6 +42,9 @@ func runDuck(cmd *cobra.Command, args []string) error {
 	query := strings.Join(args, " ")
 	result, err := searchDuck(query, numResults)
 	if err != nil {
+		if client.IsChallengeError(err) {
+			return err
+		}
 		return fmt.Errorf("duck search failed: %w", err)
 	}
 	cmd.Println(result)

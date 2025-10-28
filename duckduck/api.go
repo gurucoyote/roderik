@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -24,6 +25,28 @@ type DuckDuckGoSearchClient struct {
 	Backoff      time.Duration
 	client       *http.Client
 	UserAgent    string
+}
+
+var ErrBotChallenge = errors.New("duckduckgo bot challenge detected")
+
+type ChallengeError struct {
+	message string
+}
+
+func (e *ChallengeError) Error() string {
+	return e.message
+}
+
+func (e *ChallengeError) Unwrap() error {
+	return ErrBotChallenge
+}
+
+func NewChallengeError() error {
+	return &ChallengeError{message: "DuckDuckGo returned a bot challenge; results are unavailable until the challenge is completed manually."}
+}
+
+func IsChallengeError(err error) bool {
+	return errors.Is(err, ErrBotChallenge)
 }
 
 func NewDuckDuckGoSearchClient() *DuckDuckGoSearchClient {
@@ -86,6 +109,9 @@ func (c *DuckDuckGoSearchClient) SearchLimited(query string, limit int) ([]Resul
 	if err != nil {
 		return nil, err
 	}
+	if isChallengePage(doc) {
+		return nil, NewChallengeError()
+	}
 	results := make([]Result, 0)
 	doc.Find(".results .web-result").Each(func(i int, s *goquery.Selection) {
 		if i > limit-1 && limit > 0 {
@@ -143,4 +169,29 @@ func toInt(n string) int {
 		return 0
 	}
 	return res
+}
+
+func isChallengePage(doc *goquery.Document) bool {
+	if doc == nil {
+		return false
+	}
+	if doc.Find("#challenge-form").Length() > 0 {
+		return true
+	}
+	if doc.Find(".anomaly-modal__modal").Length() > 0 {
+		return true
+	}
+	text := doc.Text()
+	if strings.Contains(text, "Unfortunately, bots use DuckDuckGo too.") {
+		return true
+	}
+	challengeDetected := false
+	doc.Find("script").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		if strings.Contains(s.Text(), "anomalyDetectionBlock") {
+			challengeDetected = true
+			return false
+		}
+		return true
+	})
+	return challengeDetected
 }
