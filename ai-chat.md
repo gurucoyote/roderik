@@ -27,6 +27,7 @@
 - **History Manager:** Adapt or embed `kai/pkg/history` for message storage/pruning based on window size.
 - **Provider Interface:** Reuse `kai/pkg/llm` abstractions or extract minimal subset into a shared package (e.g. `internal/ai/llm`) tailored to OpenAI-compatible APIs.
 - **Tool Bridge:** Central registry under `internal/ai/tools` exposes tool metadata and handlers; chat and MCP layers consume adapters to sanitize names, list tools, and dispatch calls via shared helpers (wrapping `withPage`, etc.).
+  - Focus-sensitive tools (e.g., `to_markdown`, `get_html`, `run_js`, `text`) should expose dynamic hints that reference the currently focused DOM element so models remember to adjust scope before scraping.
 - **Execution Flow:** 
   1. Resolve model profile & load LLM provider.
   2. Instantiate tool registry (namespaced, sanitized names).
@@ -89,6 +90,7 @@
    - Convert MCP tool schemas to provider tool definitions (namespacing + sanitization).
    - Implement dispatch that maps sanitized tool names back to actual MCP tool handlers.
    - Support multi-step tool/LLM loop until assistant yields text.
+   - For focus-sensitive tools, append a runtime hint (current element summary + reminder to refocus on `<body>`/parent when full-page context is required).
 7. **Dynamic Context & Prompt**
    - Expose helpers from existing browser state to capture: current URL/title, session flags (Desktop/Stealth, etc.), focused element summary (tag + key attrs + short text), and last user/browser action.
    - Compose a concise system prompt template that mirrors MCP tool guidance: static intro (summarise Roderik workflow, reuse wording from existing MCP tool descriptions), dynamic context block, and tool list derived from shared registry.

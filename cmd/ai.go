@@ -188,13 +188,15 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 	turnPromptTokens := 0
 	turnCompletionTokens := 0
 	for i := 0; i < maxIterations; i++ {
-		fullPrompt := buildSystemPrompt(s.tools)
+		focusHint := focusAwareHint()
+		toolsForCall := s.toolsWithFocusHint(focusHint)
+		fullPrompt := buildSystemPrompt(toolsForCall)
 		if s.baseSystemPrompt != "" {
 			fullPrompt = s.baseSystemPrompt + "\n\n" + fullPrompt
 		}
 		s.provider.SetSystemPrompt(fullPrompt)
 		historyLen := len(s.history)
-		resp, err := s.provider.CreateMessage(ctx, "", s.history, s.tools)
+		resp, err := s.provider.CreateMessage(ctx, "", s.history, toolsForCall)
 		if err != nil {
 			if isTimeoutError(err) {
 				debugAI("llm iteration %d timeout: %v", i+1, err)
@@ -215,7 +217,7 @@ func (s *ChatSession) Send(ctx context.Context, input string) (string, error) {
 			"llm iteration %d: history=%d tools=%d prompt_tokens=%s completion_tokens=%s",
 			i+1,
 			historyLen,
-			len(s.tools),
+			len(toolsForCall),
 			formatTokenCount(promptTokens),
 			formatTokenCount(completionTokens),
 		)
@@ -528,7 +530,7 @@ func currentDateTimeSummary() string {
 	return strings.TrimSpace(now)
 }
 
-func focusedElementSummary() (string, bool, bool) {
+func focusElementDescriptor() (string, bool, bool) {
 	if CurrentElement == nil {
 		return "", false, false
 	}
@@ -538,7 +540,7 @@ func focusedElementSummary() (string, bool, bool) {
 		if Verbose {
 			fmt.Fprintf(os.Stderr, "warning: failed to describe current element: %v\n", err)
 		}
-		return "- Focused element: unable to describe current selection.", false, false
+		return "unable to describe current selection.", false, false
 	}
 	if props == nil {
 		return "", false, false
@@ -560,7 +562,7 @@ func focusedElementSummary() (string, bool, bool) {
 	}
 
 	var b strings.Builder
-	b.WriteString("- Focused element: <")
+	b.WriteString("<")
 	b.WriteString(tag)
 	if attrSummary != "" {
 		b.WriteByte(' ')
@@ -576,6 +578,14 @@ func focusedElementSummary() (string, bool, bool) {
 	isHeading := strings.HasPrefix(tag, "h") && len(tag) == 2 && tag[1] >= '1' && tag[1] <= '6'
 	isLink := tag == "a"
 	return b.String(), isHeading, isLink
+}
+
+func focusedElementSummary() (string, bool, bool) {
+	desc, isHeading, isLink := focusElementDescriptor()
+	if desc == "" {
+		return "", isHeading, isLink
+	}
+	return "- Focused element: " + desc, isHeading, isLink
 }
 
 func summarizeKeyAttributes(attrs []string) string {
@@ -718,6 +728,42 @@ func formatTokensHuman(n int64) string {
 	}
 
 	return strconv.FormatInt(n, 10)
+}
+
+func (s *ChatSession) toolsWithFocusHint(hint string) []llm.Tool {
+	if hint == "" || len(s.tools) == 0 {
+		return s.tools
+	}
+
+	modified := false
+	out := make([]llm.Tool, len(s.tools))
+	copy(out, s.tools)
+	for i, tool := range out {
+		def, ok := s.toolRegistry[tool.Name]
+		if !ok || !def.FocusAware {
+			continue
+		}
+		out[i].Description = fmt.Sprintf("%s\n\nFocus tip: %s", def.Description, hint)
+		modified = true
+	}
+
+	if !modified {
+		return s.tools
+	}
+	return out
+}
+
+func focusAwareHint() string {
+	desc, _, _ := focusElementDescriptor()
+	desc = strings.TrimSpace(desc)
+	if desc == "" {
+		return ""
+	}
+	desc = truncateForLog(desc, 160)
+	if strings.HasSuffix(desc, ".") {
+		desc = strings.TrimSuffix(desc, ".")
+	}
+	return fmt.Sprintf("Current focus: %s. Use parent/head/elem or refocus on <body> when you need the full page.", desc)
 }
 
 func formatTokenCount(n int) string {
