@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"roderik/internal/appdirs"
 )
 
 // ModelProfile describes the connection settings required to invoke an LLM provider.
@@ -48,11 +50,11 @@ const (
 
 // DefaultConfigPath returns the standard location for AI model profiles.
 func DefaultConfigPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil || strings.TrimSpace(home) == "" {
+	base, err := appdirs.BaseDir()
+	if err != nil || strings.TrimSpace(base) == "" {
 		return ""
 	}
-	return filepath.Join(home, ".roderik", "ai-profiles.json")
+	return filepath.Join(base, "ai-profiles.json")
 }
 
 // Load resolves the requested model profile. The selection precedence is:

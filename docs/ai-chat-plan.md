@@ -14,7 +14,7 @@
 - Global CLI structure lives in `cmd/`; register the new `ai` command (alias `chat`) from `cmd/root.go`.
 - Tool implementations live alongside MCP server helpers; refactor shared logic without breaking existing server behavior or MCP stdio mode.
 - Conversation state stays in-memory for now; design `ChatSession` to optionally serialize in future.
-- Profiles now live in `~/.roderik/ai-profiles.json`; ship a starter template in `docs/ai-profiles.example.json` and document the setup flow so users can copy it into place.
+- Profiles now live in `<config-base>/ai-profiles.json` (with `<config-base>` resolved via the shared appdirs helper—`~/.config/roderik` on Linux, `~/Library/Application Support/roderik` on macOS, `%AppData%\Roaming\roderik` on Windows, falling back to `~/.roderik`); ship a starter template in `docs/ai-profiles.example.json` and document the setup flow so users can copy it into place.
 - Existing CLI uses `--profile` to pick the Chrome `user_data/` directory; AI chat will rely on a separate model-profile flag (`--model` / `-m`) for LLM configuration to avoid collisions.
 - Respect existing logging/verbosity flags; ensure new command integrates with Cobra pattern and uses stderr for logs.
 - Network access is required for OpenAI APIs—honor environment variables for keys; provide a mock/local provider hook for tests.
@@ -37,8 +37,8 @@
   6. Stream/print assistant text; loop until exit (`/quit`, EOF).
 - **Config Surface (MVP):** 
   - Flags: `--model` (`-m`) and `--history-window`; consider `--system-prompt` later if profiles need runtime overrides.
-  - Credentials & model: default model profile pulls from `~/.roderik/ai-profiles.json` with env-variable overrides (`OPENAI_API_KEY`, `OPENAI_API_BASE`, `RODERIK_AI_MODEL`, etc.); ships with `gpt-5` default when unset.
-- Future enhancement: reintroduce `$HOME/.roderik/config.toml` profiles once core chat loop is stable.
+  - Credentials & model: default model profile pulls from `<config-base>/ai-profiles.json` (see above for resolution) with env-variable overrides (`OPENAI_API_KEY`, `OPENAI_API_BASE`, `RODERIK_AI_MODEL`, etc.); ships with `gpt-5` default when unset.
+- Future enhancement: reintroduce `<config-base>/config.toml` profiles once core chat loop is stable.
 
 ## Latest Status – October 27, 2025
 - Implemented initial `roderik ai` / `roderik chat` Cobra command that wraps a `ChatSession` and reuses the shared MCP tool registry for tool dispatch; prompts require a single-turn message for now.
@@ -53,7 +53,7 @@
 - `./cache-and-test.sh` passes, confirming the new command wires cleanly into existing tests and Windows cross-build.
 - Inline `<tool_call>` markup from non-OpenAI models is now parsed into structured tool invocations so GLM-style models don't stall after emitting XML-ish text.
 - When the loop hits the tool-iteration ceiling, we surface a user-facing fallback message summarizing the last tool result instead of crashing out of the REPL.
-- Model profiles load from JSON (`~/.roderik/ai-profiles.json`) with precedence `--model` flag → `RODERIK_AI_MODEL_PROFILE` → config default, and a tracked `docs/ai-profiles.example.json` bootstraps local setup alongside docs/ai-profiles.md.
+- Model profiles load from JSON (`<config-base>/ai-profiles.json`) with precedence `--model` flag → `RODERIK_AI_MODEL_PROFILE` → config default, and a tracked `docs/ai-profiles.example.json` bootstraps local setup alongside docs/ai-profiles.md.
 - Inline or env-sourced API keys are supported (`api_key` wins over `api_key_env` / `OPENAI_API_KEY`); tests cover both flows.
 - AI activity logs now mirror a human operator workflow (e.g., `AI ▶ duck query="…"`, `✔ duck → …`) while detailed iteration metrics remain behind `--verbose`.
 - Each turn now ends with a concise summary of the tool chain plus running prompt/completion token totals (e.g., `tokens this turn 3.5k / 0.6k, total 128k`).
@@ -78,7 +78,7 @@
    - Introduce new internal packages for history management, profile handling, provider abstraction, and context building—reusing `kai/pkg/history` & `kai/pkg/llm` (copy or move to shared module while avoiding module import cycles).
    - Define `ai` package types: `Profile`, `ProfileManager`, `ChatSession`, `ContextBuilder` to encapsulate config/history/tool invocation/system prompt assembly.
 4. **Profile Configuration**
-   - Load from `$HOME/.roderik/ai-profiles.json`; seed from `docs/ai-profiles.example.json` if absent and add gitignore guidance (done).
+   - Load from `<config-base>/ai-profiles.json`; seed from `docs/ai-profiles.example.json` if absent and add gitignore guidance (done).
    - Implement loader with precedence: CLI flag (`--model` / `-m`) → env override → config default.
    - Validate required fields (`provider`, `model`, and either `api_key` or `api_key_env`); allow optional `system_prompt` and `max_tokens`.
    - Add command `roderik ai profiles list` (optional, nice-to-have) or at least helpful errors.
