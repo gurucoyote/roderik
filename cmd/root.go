@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -738,6 +739,8 @@ var browserInitErr error
 var desktopWSURL string
 var desktopHostUsed string
 
+const defaultNavigationTimeout = 45 * time.Second
+
 var registerPageEvents = func(p *rod.Page) {
 	p.EnableDomain(proto.NetworkEnable{})
 	go p.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
@@ -1143,13 +1146,50 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	setActiveEventLog(eventLog)
 	ensurePageEventHandlers(Page)
 
-	if err := Page.Navigate(targetURL); err != nil {
-		return nil, err
+	navCtx := Page.Timeout(defaultNavigationTimeout)
+	defer func() {
+		Page = navCtx.CancelTimeout()
+	}()
+
+	if err := navCtx.Navigate(targetURL); err != nil {
+		if !isNavigationAborted(err) {
+			return nil, fmt.Errorf("navigate to %s failed: %w", targetURL, err)
+		}
+		if info, infoErr := navCtx.Info(); infoErr != nil || info.URL == "" {
+			return nil, fmt.Errorf("navigation aborted while loading %s: %w", targetURL, err)
+		}
 	}
-	if err := Page.WaitLoad(); err != nil {
-		return nil, err
+
+	if err := navCtx.WaitLoad(); err != nil {
+		switch {
+		case isNavigationAborted(err):
+			// ignore transient aborted errors from redirects
+		case errors.Is(err, context.DeadlineExceeded):
+			if !pageReady(navCtx) {
+				return nil, fmt.Errorf("timed out waiting for %s to finish loading: %w", targetURL, err)
+			}
+		default:
+			return nil, err
+		}
 	}
+
 	return Page, nil
+}
+
+func isNavigationAborted(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "net::ERR_ABORTED")
+}
+
+func pageReady(p *rod.Page) bool {
+	if p == nil {
+		return false
+	}
+	res, err := p.Eval(`() => document.readyState`)
+	if err != nil || res == nil {
+		return false
+	}
+	state := strings.ToLower(res.Value.Str())
+	return state == "complete" || state == "interactive"
 }
 
 // PrettyFormat function
