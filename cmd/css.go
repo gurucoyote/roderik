@@ -1,10 +1,9 @@
 package cmd
 
 import (
-	// "encoding/json"
 	"fmt"
+
 	"github.com/spf13/cobra"
-	// "github.com/go-rod/rod/lib/proto"
 )
 
 var ComputedStyleCmd = &cobra.Command{
@@ -15,9 +14,7 @@ var ComputedStyleCmd = &cobra.Command{
 			fmt.Println("No current element selected.")
 			return
 		}
-		// Evaluate JavaScript code to get the computed styles of the element
-		// Print the computed styles
-		styles := CurrentElement.MustEval(`() => {
+		styles, err := CurrentElement.Eval(`() => {
 		// Get the computed style for the element
 		var style = window.getComputedStyle(this);
 		var styleObject = {};
@@ -32,7 +29,11 @@ var ComputedStyleCmd = &cobra.Command{
 		}
 		return styleObject;
 	}`)
-		fmt.Println(PrettyFormat(styles))
+		if err != nil {
+			fmt.Println("Error computing styles:", err)
+			return
+		}
+		fmt.Println(PrettyFormat(styles.Value))
 	},
 }
 

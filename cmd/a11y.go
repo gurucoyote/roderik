@@ -17,12 +17,18 @@ var quaxCmd = &cobra.Command{
 		if len(args) > 0 {
 			url := args[0]
 			if isValidURL(url) {
-				Page, err := LoadURL(url)
+				newPage, err := LoadURL(url)
 				if err != nil {
 					fmt.Println("Error loading URL:", err)
 					return
 				}
-				CurrentElement = Page.MustElement("body")
+				Page = newPage
+				body, err := Page.Element("body")
+				if err != nil {
+					fmt.Println("Error selecting <body> element:", err)
+					return
+				}
+				CurrentElement = body
 			}
 		}
 		if !hasCurrentElement() {
@@ -114,12 +120,18 @@ var markdownCmd = &cobra.Command{
 			url := args[0]
 			if isValidURL(url) {
 				var err error
-				Page, err = LoadURL(url)
+				newPage, err := LoadURL(url)
 				if err != nil {
 					fmt.Println("Error loading URL:", err)
 					return
 				}
-				CurrentElement = Page.MustElement("html")
+				Page = newPage
+				el, err := Page.Element("html")
+				if err != nil {
+					fmt.Println("Error selecting <html> element:", err)
+					return
+				}
+				CurrentElement = el
 			} else {
 			}
 		}

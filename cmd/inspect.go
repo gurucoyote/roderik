@@ -52,12 +52,18 @@ var HtmlCmd = &cobra.Command{
 		if len(args) > 0 {
 			url := args[0]
 			if isValidURL(url) {
-				Page, err := LoadURL(url)
+				newPage, err := LoadURL(url)
 				if err != nil {
 					fmt.Println("Error loading URL:", err)
 					return
 				}
-				CurrentElement = Page.MustElement("html")
+				Page = newPage
+				el, err := Page.Element("html")
+				if err != nil {
+					fmt.Println("Error selecting <html> element:", err)
+					return
+				}
+				CurrentElement = el
 			}
 		}
 		if !hasCurrentElement() {

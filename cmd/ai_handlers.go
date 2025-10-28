@@ -86,7 +86,11 @@ func loadURLHandler(ctx context.Context, args map[string]interface{}) (aitools.R
 			return aitools.Result{}, fmt.Errorf("load_url failed to select <body>: %w", err)
 		}
 		CurrentElement = body
-		msg := fmt.Sprintf("navigated to %s", page.MustInfo().URL)
+		info, err := page.Info()
+		if err != nil {
+			return aitools.Result{}, fmt.Errorf("load_url failed to read page info: %w", err)
+		}
+		msg := fmt.Sprintf("navigated to %s", info.URL)
 		return aitools.Result{Text: msg}, nil
 	})
 	if err != nil {

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/go-rod/rod"
@@ -131,8 +132,14 @@ var FindCmd = &cobra.Command{
 		// filter for those whose own text nodes include our substring
 		var matches []*rod.Element
 		for _, el := range all {
-			rv := el.MustEval(ownTextJS)
-			txt := rv.Str()
+			rv, err := el.Eval(ownTextJS)
+			if err != nil {
+				if Verbose {
+					fmt.Fprintf(os.Stderr, "warning: skipping element after eval error: %v\n", err)
+				}
+				continue
+			}
+			txt := rv.Value.Str()
 			if strings.Contains(txt, substr) {
 				matches = append(matches, el)
 			}

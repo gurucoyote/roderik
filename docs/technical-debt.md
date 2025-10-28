@@ -6,16 +6,16 @@ This document tracks outstanding cleanups and improvement ideas that surfaced wh
 
 The original `TodoMustElimination.txt` enumerated lingering `Must*` helpers that will panic on error. Each needs a defensive wrapper so the CLI/MCP server returns an actionable error instead of crashing.
 
-- [ ] `cmd/css.go`: `CurrentElement.MustEval(...)` inside `computedstyles`
-- [ ] `cmd/a11y.go`:
+- [x] `cmd/css.go`: `CurrentElement.MustEval(...)` inside `computedstyles`
+- [x] `cmd/a11y.go`:
   - `Page.MustElement("body")` in `quax` URL loading path
   - `Page.MustElement("html")` in the Markdown exporter path
-- [ ] `cmd/inspect.go`: `Page.MustElement("html")` when the `html` command loads a URL
-- [ ] `cmd/mcp.go` tool handlers:
+- [x] `cmd/inspect.go`: `Page.MustElement("html")` when the `html` command loads a URL
+- [x] `cmd/mcp.go` tool handlers:
   - `load_url`: `page.MustElement("body")`, `page.MustInfo().URL`
   - `to_markdown`: `page.MustElement("body")`
-- [ ] `cmd/navigate.go`: `CurrentElement.MustElement(":first-child")` in `child`
-- [ ] `cmd/root.go`:
+- [x] `cmd/navigate.go`: `CurrentElement.MustElement(":first-child")` in `child`
+- [x] `cmd/root.go`:
   - `stealth.MustPage(Browser)`
   - `Browser.MustPage("about:blank")`
   - `Page.MustWaitLoad().MustWaitIdle()`

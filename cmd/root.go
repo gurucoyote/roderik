@@ -787,8 +787,30 @@ var registerPageEvents = func(p *rod.Page) {
 		}
 	})()
 	go p.EachEvent(func(e *proto.RuntimeConsoleAPICalled) {
-		fmt.Fprintln(os.Stderr, "console:", p.MustObjectsToJSON(e.Args))
+		output, err := formatConsoleArgs(p, e.Args)
+		if err != nil {
+			if Verbose {
+				fmt.Fprintf(os.Stderr, "warning: failed to format console args: %v\n", err)
+			}
+			return
+		}
+		fmt.Fprintln(os.Stderr, "console:", output)
 	})()
+}
+
+func formatConsoleArgs(p *rod.Page, args []*proto.RuntimeRemoteObject) (string, error) {
+	if p == nil {
+		return "", fmt.Errorf("nil page")
+	}
+	values := make([]interface{}, 0, len(args))
+	for _, arg := range args {
+		j, err := p.ObjectToJSON(arg)
+		if err != nil {
+			return "", err
+		}
+		values = append(values, j.Val())
+	}
+	return fmt.Sprint(values), nil
 }
 
 func ensurePageEventHandlers(p *rod.Page) {
@@ -803,6 +825,16 @@ func ensurePageEventHandlers(p *rod.Page) {
 
 	registerPageEvents(p)
 	pageEventPage = p
+}
+
+func newPageForBrowser(b *rod.Browser) (*rod.Page, error) {
+	if b == nil {
+		return nil, fmt.Errorf("browser is nil")
+	}
+	if Stealth {
+		return stealth.Page(b)
+	}
+	return b.Page(proto.TargetCreateTarget{URL: "about:blank"})
 }
 
 func ensurePageReady() error {
@@ -832,11 +864,13 @@ func ensurePageReady() error {
 			return err
 		}
 		Browser = tmp
-		if Stealth {
-			Page = stealth.MustPage(Browser)
-		} else {
-			Page = Browser.MustPage("about:blank")
+		page, err := newPageForBrowser(Browser)
+		if err != nil {
+			Browser = nil
+			Page = nil
+			return err
 		}
+		Page = page
 	}
 
 	return nil
@@ -904,11 +938,14 @@ var RootCmd = &cobra.Command{
 			}
 			browserInitErr = nil
 			Browser = tmp
-			if Stealth {
-				Page = stealth.MustPage(Browser)
-			} else {
-				Page = Browser.MustPage("about:blank")
+			page, err := newPageForBrowser(Browser)
+			if err != nil {
+				browserInitErr = err
+				Page = nil
+				Browser = nil
+				return
 			}
+			Page = page
 		}
 		// fmt.Println(Page.MustInfo())
 	},
@@ -1033,7 +1070,10 @@ func PrepareBrowser() (*rod.Browser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to launch browser: %w", err)
 	}
-	browser := rod.New().ControlURL(controlURL).MustConnect()
+	browser := rod.New().ControlURL(controlURL)
+	if err := browser.Connect(); err != nil {
+		return nil, fmt.Errorf("failed to connect to browser: %w", err)
+	}
 
 	return browser, nil
 }
@@ -1106,7 +1146,9 @@ func LoadURL(targetURL string) (*rod.Page, error) {
 	if err := Page.Navigate(targetURL); err != nil {
 		return nil, err
 	}
-	Page.MustWaitLoad()
+	if err := Page.WaitLoad(); err != nil {
+		return nil, err
+	}
 	return Page, nil
 }
 
@@ -1124,7 +1166,12 @@ func prettyPrintJson(s string) string {
 	return string(b)
 }
 func ReportElement(el *rod.Element) {
-	tagName := el.MustEval("() => this.tagName").String()
+	tag, err := el.Eval("() => this.tagName")
+	if err != nil {
+		fmt.Println("Error getting tag name:", err)
+		return
+	}
+	tagName := tag.Value.Str()
 	children, err := el.Elements("*")
 	if err != nil {
 		fmt.Println("Error getting children:", err)
@@ -1176,8 +1223,13 @@ var ReloadCmd = &cobra.Command{
 	Short: "Reload the current page",
 	Long:  `This command will reload the current page.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		currentURL := Page.MustInfo().URL
-		_, err := LoadURL(currentURL)
+		info, err := Page.Info()
+		if err != nil {
+			fmt.Println("Error retrieving current page info:", err)
+			return
+		}
+		currentURL := info.URL
+		_, err = LoadURL(currentURL)
 		if err != nil {
 			fmt.Println("Error reloading URL:", err)
 			return
@@ -1402,7 +1454,11 @@ func connectToWindowsDesktopChrome(logf func(string, ...interface{})) (string, s
 		return "", "", fmt.Errorf("failed to list Chrome pages: %w", err)
 	}
 	if len(pages) == 0 {
-		Page = Browser.MustPage("").Context(context.Background())
+		newPage, err := Browser.Page(proto.TargetCreateTarget{URL: ""})
+		if err != nil {
+			return "", "", fmt.Errorf("failed to open new Chrome page: %w", err)
+		}
+		Page = newPage.Context(context.Background())
 	} else {
 		Page = pages[0].Context(context.Background())
 		if _, err := Page.Activate(); err != nil && Verbose {
