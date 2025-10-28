@@ -1,4 +1,6 @@
-Here are example JavaScript snippets for extracting common types of information from a web page, using traumwind.de as an example. I also include the exact code used and the returned data for each extraction, which you can use for your cookbook:
+# JavaScript Extraction Cookbook
+
+Here are example JavaScript snippets for extracting common types of information from a web page, using traumwind.de as an example. The snippets below include the exact code and representative output so you can reuse them when driving pages through MCP.
 
 ---
 
