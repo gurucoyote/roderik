@@ -21,6 +21,8 @@ go mod download
 echo "Running go test with GOCACHE=$GOCACHE"
 go test ./... "$@"
 
+echo "compiling roderik executable"
+go build .
 echo "Cross-compiling Windows binary (GOOS=windows GOARCH=amd64)"
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o "$project_root/roderik.exe" .
 echo "Windows build complete: $project_root/roderik.exe"
