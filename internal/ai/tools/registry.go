@@ -146,6 +146,39 @@ var definitions = []Definition{
 		},
 	},
 	{
+		Name:        "network_list",
+		Description: "List captured network activity entries with optional filters.",
+		Parameters: []Parameter{
+			{Name: "mime", Type: ParamString, Description: "optional comma-separated MIME substrings to match"},
+			{Name: "suffix", Type: ParamString, Description: "optional comma-separated URL suffixes (e.g. .mp4)"},
+			{Name: "status", Type: ParamString, Description: "optional comma-separated HTTP status codes"},
+			{Name: "contains", Type: ParamString, Description: "optional comma-separated substrings to match in the URL"},
+			{Name: "method", Type: ParamString, Description: "optional comma-separated HTTP methods"},
+			{Name: "domain", Type: ParamString, Description: "optional comma-separated domain substrings"},
+			{Name: "type", Type: ParamString, Description: "optional comma-separated resource types (Document, Image, Media, etc.)"},
+			{Name: "limit", Type: ParamNumber, Description: "maximum number of entries to return (default 20, capped at 1000)"},
+			{Name: "offset", Type: ParamNumber, Description: "number of matching entries to skip before returning results"},
+			{Name: "tail", Type: ParamBoolean, Description: "when true (default) return the newest matching entries"},
+		},
+	},
+	{
+		Name:        "network_save",
+		Description: "Retrieve or persist the response body for a captured network request.",
+		Parameters: []Parameter{
+			{Name: "request_id", Type: ParamString, Description: "request identifier returned by network_list", Required: true},
+			{Name: "return", Type: ParamString, Description: "delivery mode: binary (default) or file", Enum: []string{"binary", "file"}},
+			{Name: "save_dir", Type: ParamString, Description: "optional directory to write the file when return=file"},
+			{Name: "filename", Type: ParamString, Description: "optional filename override when saving to disk"},
+		},
+	},
+	{
+		Name:        "network_set_logging",
+		Description: "Enable, disable, or query network activity logging without restarting Roderik.",
+		Parameters: []Parameter{
+			{Name: "enabled", Type: ParamBoolean, Description: "optional flag; when provided sets logging state to the given value"},
+		},
+	},
+	{
 		Name: "to_markdown",
 		Description: "Convert the current page/element (or an optional URL) into a structured Markdown document. " +
 			"This produces a well-formatted, token-efficient summary. " +
