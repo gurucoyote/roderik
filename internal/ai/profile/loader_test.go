@@ -207,3 +207,12 @@ func TestLoaderUsesInlineAPIKeyWhenProvided(t *testing.T) {
 		t.Fatalf("expected inline api key to win, got %q", prof.APIKey)
 	}
 }
+
+func TestDefaultConfigPathHonorsAppdirsBaseDir(t *testing.T) {
+	t.Setenv("RODERIK_HOME", "/custom/roderik")
+	path := DefaultConfigPath()
+	expect := filepath.FromSlash("/custom/roderik/ai-profiles.json")
+	if path != expect {
+		t.Fatalf("expected default config path %q, got %q", expect, path)
+	}
+}

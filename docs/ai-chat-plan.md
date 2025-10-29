@@ -37,6 +37,7 @@
   6. Stream/print assistant text; loop until exit (`/quit`, EOF).
 - **Config Surface (MVP):** 
   - Flags: `--model` (`-m`) and `--history-window`; consider `--system-prompt` later if profiles need runtime overrides.
+  - Diagnostic flag: `--print-config-path` dumps the resolved `<config-base>/ai-profiles.json` path to simplify setup across Linux/macOS/Windows.
   - Credentials & model: default model profile pulls from `<config-base>/ai-profiles.json` (see above for resolution) with env-variable overrides (`OPENAI_API_KEY`, `OPENAI_API_BASE`, `RODERIK_AI_MODEL`, etc.); ships with `gpt-5` default when unset.
 - Future enhancement: reintroduce `<config-base>/config.toml` profiles once core chat loop is stable.
 

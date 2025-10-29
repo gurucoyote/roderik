@@ -66,7 +66,7 @@ This document captures the planned improvements for handling Chrome/Chromium pro
 
 6. **Future Enhancements (optional)**
    - `roderik profiles list`: CLI subcommand to list available profiles without launching Chrome.
-   - Persist “last used” profile per host in a config file (`~/.config/roderik/config.json`) and auto-select unless overridden.
+   - Persist “last used” profile per host in a config file (`<config-base>/config.json`; `%AppData%\Roaming\roderik\config.json` on Windows) and auto-select unless overridden.
    - Autocomplete for `--profile` based on discovered directories.
    - Mirror the Windows desktop picker inside the headless `PrepareBrowser` path so TTY sessions can interactively choose or create profiles backed by `user_data/` directories.
 

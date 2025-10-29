@@ -34,9 +34,12 @@ const (
 )
 
 var (
-	aiHistoryWindow int
-	aiModelProfile  string
+	aiHistoryWindow   int
+	aiModelProfile    string
+	aiPrintConfigPath bool
+)
 
+var (
 	chatSession *ChatSession
 
 	aiCmd = &cobra.Command{
@@ -53,6 +56,7 @@ var (
 func init() {
 	aiCmd.Flags().IntVar(&aiHistoryWindow, "history-window", defaultAIHistoryWindow, "Number of recent AI chat messages to retain (0 keeps the full history)")
 	aiCmd.Flags().StringVarP(&aiModelProfile, "model", "m", "", "Model profile to use for the AI assistant (defaults to config or environment)")
+	aiCmd.Flags().BoolVar(&aiPrintConfigPath, "print-config-path", false, "Print the resolved AI profile config file path and exit")
 	RootCmd.AddCommand(aiCmd)
 }
 
@@ -68,6 +72,15 @@ type ChatSession struct {
 }
 
 func runAICommand(cmd *cobra.Command, args []string) error {
+	if aiPrintConfigPath {
+		path := profile.DefaultConfigPath()
+		if strings.TrimSpace(path) == "" {
+			return fmt.Errorf("unable to determine config directory; set RODERIK_HOME or run inside a user context with a home directory")
+		}
+		fmt.Println(path)
+		return nil
+	}
+
 	input := strings.TrimSpace(strings.Join(args, " "))
 	if input == "" {
 		return fmt.Errorf("ai command requires a prompt; try `roderik ai inspect the login form`")
