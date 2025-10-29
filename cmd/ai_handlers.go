@@ -775,21 +775,32 @@ func xpathHandler(ctx context.Context, args map[string]interface{}) (aitools.Res
 	})
 }
 
+const (
+	networkListDefaultLimit = 20
+	networkListMaxLimit     = 1000
+)
+
 type networkEntrySummary struct {
-	RequestID        string `json:"request_id"`
-	URL              string `json:"url"`
-	Method           string `json:"method"`
-	Status           *int   `json:"status,omitempty"`
-	MIMEType         string `json:"mime_type,omitempty"`
-	ResourceType     string `json:"resource_type,omitempty"`
-	EncodedBytes     *int   `json:"encoded_bytes,omitempty"`
-	FinishedBytes    *int   `json:"finished_bytes,omitempty"`
-	Failure          string `json:"failure,omitempty"`
-	Canceled         bool   `json:"canceled,omitempty"`
-	HasBody          bool   `json:"has_body"`
-	Retrieved        bool   `json:"retrieved,omitempty"`
-	RequestTimestamp string `json:"request_time,omitempty"`
-	ResponseTime     string `json:"response_time,omitempty"`
+	RequestID    string `json:"request_id"`
+	URL          string `json:"url"`
+	Method       string `json:"method"`
+	Status       *int   `json:"status,omitempty"`
+	MIMEType     string `json:"mime_type,omitempty"`
+	ResourceType string `json:"resource_type,omitempty"`
+	Failure      string `json:"failure,omitempty"`
+	Canceled     bool   `json:"canceled,omitempty"`
+	HasBody      bool   `json:"has_body"`
+	Retrieved    bool   `json:"retrieved,omitempty"`
+}
+
+type networkListResponse struct {
+	Total    int                   `json:"total"`
+	Offset   int                   `json:"offset"`
+	Limit    int                   `json:"limit"`
+	Returned int                   `json:"returned"`
+	Tail     bool                  `json:"tail"`
+	HasMore  bool                  `json:"has_more"`
+	Entries  []networkEntrySummary `json:"entries"`
 }
 
 func networkListHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
@@ -806,17 +817,103 @@ func networkListHandler(ctx context.Context, args map[string]interface{}) (aitoo
 	}
 
 	entries := log.FilterEntries(filter)
-	summaries := make([]networkEntrySummary, 0, len(entries))
-	for _, entry := range entries {
+	limit := networkListDefaultLimit
+	if raw, ok := args["limit"]; ok {
+		value, okInt := toInt(raw)
+		if !okInt {
+			return aitools.Result{}, fmt.Errorf("network_list: limit must be an integer")
+		}
+		if value < 0 {
+			return aitools.Result{}, fmt.Errorf("network_list: limit must be non-negative")
+		}
+		if value == 0 {
+			limit = networkListDefaultLimit
+		} else {
+			limit = value
+		}
+	}
+	if limit > networkListMaxLimit {
+		limit = networkListMaxLimit
+	}
+
+	tail := true
+	if raw, ok := args["tail"]; ok {
+		value, okBool := toBool(raw)
+		if !okBool {
+			return aitools.Result{}, fmt.Errorf("network_list: tail must be boolean")
+		}
+		tail = value
+	}
+
+	offset := 0
+	if !tail {
+		if raw, ok := args["offset"]; ok {
+			value, okInt := toInt(raw)
+			if !okInt {
+				return aitools.Result{}, fmt.Errorf("network_list: offset must be an integer")
+			}
+			if value < 0 {
+				return aitools.Result{}, fmt.Errorf("network_list: offset must be non-negative")
+			}
+			offset = value
+		}
+	}
+
+	total := len(entries)
+	var window []*NetworkLogEntry
+	start := offset
+
+	switch {
+	case tail:
+		if limit <= 0 || limit > total {
+			start = 0
+		} else {
+			start = total - limit
+			if start < 0 {
+				start = 0
+			}
+		}
+		window = entries[start:]
+		if limit > 0 && len(window) > limit {
+			window = window[len(window)-limit:]
+		}
+	default:
+		if offset > total {
+			offset = total
+		}
+		start = offset
+		window = entries[offset:]
+		if limit > 0 && len(window) > limit {
+			window = window[:limit]
+		}
+	}
+
+	summaries := make([]networkEntrySummary, 0, len(window))
+	for _, entry := range window {
 		summaries = append(summaries, summarizeNetworkEntry(entry))
 	}
 
-	payload, err := json.MarshalIndent(summaries, "", "  ")
+	resp := networkListResponse{
+		Total:    total,
+		Offset:   start,
+		Limit:    limit,
+		Returned: len(summaries),
+		Tail:     tail,
+		HasMore: func() bool {
+			if tail {
+				return start > 0
+			}
+			return start+len(summaries) < total
+		}(),
+		Entries: summaries,
+	}
+
+	payload, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
 		return aitools.Result{}, fmt.Errorf("network_list: marshal summaries: %w", err)
 	}
 
-	toolDebug("[TOOLS] network_list RESULT count=%d", len(summaries))
+	toolDebug("[TOOLS] network_list RESULT count=%d total=%d offset=%d limit=%d", len(summaries), total, offset, limit)
 	return aitools.Result{Text: string(payload)}, nil
 }
 
@@ -936,23 +1033,15 @@ func summarizeNetworkEntry(entry *NetworkLogEntry) networkEntrySummary {
 		HasBody:      entry.Response != nil,
 	}
 	if !entry.RequestTimestamp.IsZero() {
-		summary.RequestTimestamp = entry.RequestTimestamp.Format(time.RFC3339)
+		// Request timestamp currently omitted from compact representation.
 	}
 	if entry.Response != nil {
 		status := entry.Response.Status
 		summary.Status = &status
 		summary.MIMEType = entry.Response.MIMEType
-		if entry.Response.EncodedDataLength > 0 {
-			encoded := int(entry.Response.EncodedDataLength)
-			summary.EncodedBytes = &encoded
-		}
-		if !entry.Response.ResponseTimestamp.IsZero() {
-			summary.ResponseTime = entry.Response.ResponseTimestamp.Format(time.RFC3339)
-		}
 	}
 	if entry.Finished != nil && entry.Finished.EncodedDataLength > 0 {
-		finished := int(entry.Finished.EncodedDataLength)
-		summary.FinishedBytes = &finished
+		// retained only in detailed views; omit here to keep payload compact.
 	}
 	if entry.Failure != nil {
 		summary.Failure = entry.Failure.ErrorText

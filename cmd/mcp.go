@@ -254,6 +254,9 @@ func runMCP(cmd *cobra.Command, args []string) {
 			mcp.WithArray("method", mcp.Items(map[string]interface{}{"type": "string"})),
 			mcp.WithArray("domain", mcp.Items(map[string]interface{}{"type": "string"})),
 			mcp.WithArray("type", mcp.Items(map[string]interface{}{"type": "string"})),
+			mcp.WithNumber("limit", mcp.Description("maximum number of entries to return (default 20, capped at 1000)")),
+			mcp.WithNumber("offset", mcp.Description("number of matching entries to skip before returning results")),
+			mcp.WithBoolean("tail", mcp.Description("when true (default) return the newest matching entries")),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			log.Printf("[MCP] TOOL network_list CALLED args=%#v", req.Params.Arguments)
