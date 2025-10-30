@@ -927,7 +927,7 @@ func networkSaveHandler(ctx context.Context, args map[string]interface{}) (aitoo
 	saveDir := strings.TrimSpace(mcp.ExtractString(args, "save_dir"))
 	returnMode := strings.TrimSpace(strings.ToLower(mcp.ExtractString(args, "return")))
 	if returnMode == "" {
-		returnMode = "binary"
+		returnMode = "file"
 	}
 	filenameOverride := strings.TrimSpace(mcp.ExtractString(args, "filename"))
 
@@ -970,7 +970,7 @@ func networkSaveHandler(ctx context.Context, args map[string]interface{}) (aitoo
 	}
 
 	switch returnMode {
-	case "file":
+	case "file", "save":
 		if saveDir == "" {
 			saveDir = defaultDownloadsDir()
 		}

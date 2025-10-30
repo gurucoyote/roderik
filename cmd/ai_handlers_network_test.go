@@ -4,7 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/go-rod/rod"
 )
 
 func TestNetworkListHandlerDefaultLimit(t *testing.T) {
@@ -138,5 +143,123 @@ func TestNetworkListHandlerInvalidOffset(t *testing.T) {
 	}
 	if _, err := networkListHandler(context.Background(), args); err == nil {
 		t.Fatalf("expected error for negative offset")
+	}
+}
+
+func TestNetworkSaveHandlerDefaultsToServerFile(t *testing.T) {
+	prevLog := getActiveEventLog()
+	prevBrowser := Browser
+	prevPage := Page
+	t.Cleanup(func() {
+		setActiveEventLog(prevLog)
+		Browser = prevBrowser
+		Page = prevPage
+	})
+
+	Browser = &rod.Browser{}
+	Page = &rod.Page{}
+
+	log := newNetworkEventLog()
+	body := []byte("server-only-data")
+	entry := &NetworkLogEntry{
+		RequestID: "req-default",
+		URL:       "https://example.com/resource.bin",
+		Method:    "GET",
+		Response: &NetworkResponseInfo{
+			MIMEType: "application/octet-stream",
+		},
+		Body: &NetworkBody{
+			Data: body,
+		},
+	}
+	log.entries["req-default"] = entry
+	log.order = append(log.order, "req-default")
+	setActiveEventLog(log)
+
+	tmpDir := t.TempDir()
+	args := map[string]interface{}{
+		"request_id": "req-default",
+		"save_dir":   tmpDir,
+	}
+
+	res, err := networkSaveHandler(context.Background(), args)
+	if err != nil {
+		t.Fatalf("networkSaveHandler returned error: %v", err)
+	}
+	if len(res.Binary) != 0 {
+		t.Fatalf("expected no binary payload, got %d bytes", len(res.Binary))
+	}
+	if res.FilePath == "" {
+		t.Fatalf("expected file path in response")
+	}
+	if filepath.Dir(res.FilePath) != tmpDir {
+		t.Fatalf("expected file saved under %q, got %q", tmpDir, filepath.Dir(res.FilePath))
+	}
+
+	data, err := os.ReadFile(res.FilePath)
+	if err != nil {
+		t.Fatalf("reading saved file: %v", err)
+	}
+	if string(data) != string(body) {
+		t.Fatalf("expected saved file contents %q, got %q", string(body), string(data))
+	}
+	if !strings.Contains(res.Text, res.FilePath) {
+		t.Fatalf("expected response text to mention saved path, got %q", res.Text)
+	}
+	if res.ContentType != "application/octet-stream" {
+		t.Fatalf("expected content type application/octet-stream, got %q", res.ContentType)
+	}
+}
+
+func TestNetworkSaveHandlerBinaryModeReturnsPayload(t *testing.T) {
+	prevLog := getActiveEventLog()
+	prevBrowser := Browser
+	prevPage := Page
+	t.Cleanup(func() {
+		setActiveEventLog(prevLog)
+		Browser = prevBrowser
+		Page = prevPage
+	})
+
+	Browser = &rod.Browser{}
+	Page = &rod.Page{}
+
+	log := newNetworkEventLog()
+	body := []byte("inline-binary-data")
+	entry := &NetworkLogEntry{
+		RequestID: "req-binary",
+		URL:       "https://example.com/inline.bin",
+		Method:    "GET",
+		Response: &NetworkResponseInfo{
+			MIMEType: "application/octet-stream",
+		},
+		Body: &NetworkBody{
+			Data: body,
+		},
+	}
+	log.entries["req-binary"] = entry
+	log.order = append(log.order, "req-binary")
+	setActiveEventLog(log)
+
+	args := map[string]interface{}{
+		"request_id": "req-binary",
+		"return":     "binary",
+	}
+
+	res, err := networkSaveHandler(context.Background(), args)
+	if err != nil {
+		t.Fatalf("networkSaveHandler returned error: %v", err)
+	}
+	if res.FilePath != "" {
+		t.Fatalf("expected no file path when returning binary, got %q", res.FilePath)
+	}
+	if string(res.Binary) != string(body) {
+		t.Fatalf("expected binary payload %q, got %q", string(body), string(res.Binary))
+	}
+	if res.ContentType != "application/octet-stream" {
+		t.Fatalf("expected content type application/octet-stream, got %q", res.ContentType)
+	}
+	if !strings.Contains(res.Text, "retrieved") {
+		t.Fatalf("expected response text to indicate retrieval, got %q", res.Text)
 	}
 }

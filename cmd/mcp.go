@@ -278,7 +278,7 @@ func runMCP(cmd *cobra.Command, args []string) {
 			"network_save",
 			mcp.WithDescription("Retrieve or persist the response body for a captured network request."),
 			mcp.WithString("request_id", mcp.Required(), mcp.Description("request identifier returned by network_list")),
-			mcp.WithString("return", mcp.Description("delivery mode: binary (default) or file"), mcp.Enum("binary", "file"), mcp.DefaultString("binary")),
+			mcp.WithString("return", mcp.Description("delivery mode: file (default) saves on the server, binary streams the payload, save aliases file"), mcp.Enum("file", "binary", "save"), mcp.DefaultString("file")),
 			mcp.WithString("save_dir", mcp.Description("optional directory to write the file when return=file")),
 			mcp.WithString("filename", mcp.Description("optional filename override when saving to disk")),
 		),

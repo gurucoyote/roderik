@@ -166,7 +166,7 @@ var definitions = []Definition{
 		Description: "Retrieve or persist the response body for a captured network request.",
 		Parameters: []Parameter{
 			{Name: "request_id", Type: ParamString, Description: "request identifier returned by network_list", Required: true},
-			{Name: "return", Type: ParamString, Description: "delivery mode: binary (default) or file", Enum: []string{"binary", "file"}},
+			{Name: "return", Type: ParamString, Description: "delivery mode: file (default) saves on the server, binary streams the payload (save aliases file)", Enum: []string{"file", "binary", "save"}},
 			{Name: "save_dir", Type: ParamString, Description: "optional directory to write the file when return=file"},
 			{Name: "filename", Type: ParamString, Description: "optional filename override when saving to disk"},
 		},

@@ -19,9 +19,18 @@ func ensureUserDataRoot() (string, error) {
 }
 
 func defaultDownloadsDir() string {
-	dir, err := appdirs.DownloadsDir()
-	if err != nil || strings.TrimSpace(dir) == "" {
-		return filepath.Join("user_data", "downloads")
+	root, err := ensureUserDataRoot()
+	if err == nil && strings.TrimSpace(root) != "" {
+		return filepath.Join(root, "downloads")
 	}
-	return dir
+
+	dir, dirErr := appdirs.DownloadsDir()
+	if dirErr == nil && strings.TrimSpace(dir) != "" {
+		return dir
+	}
+
+	if abs, absErr := filepath.Abs(filepath.Join("user_data", "downloads")); absErr == nil {
+		return abs
+	}
+	return filepath.Join("user_data", "downloads")
 }

@@ -28,7 +28,12 @@
 ## Implementation Snapshot (2025-10-28)
 
 - `roderik netlog` lists the structured log and supports filters via `--mime`, `--suffix`, `--status`, `--domain`, `--method`, and `--type`. Pass `--save` to persist matching entries; by default we prompt with a `survey` multi-select unless `--all` or `--interactive=false` is provided. Outputs are written to the configured downloads directory (defaults to `<roderik base>/user_data/downloads/`, override with `--output` or `RODERIK_DOWNLOAD_DIR`).
-- `network_list` / `network_save` MCP tools expose the same functionality to agent clients. `network_list` returns a compact JSON object with metadata (`total`, `offset`, `limit`, `tail`, `has_more`, `entries`) and defaults to the most recent 20 summaries (capped at 1000). Use `tail=false` with `offset` for chronological paging, or override `limit` for larger windows. `network_save` streams the response body back (binary) or writes it to disk when `return=file`.
+- `network_list` / `network_save` MCP tools expose the same functionality to agent clients. `network_list` returns a compact JSON object with metadata (`total`, `offset`, `limit`, `tail`, `has_more`, `entries`) and defaults to the most recent 20 summaries (capped at 1000). Use `tail=false` with `offset` for chronological paging, or override `limit` for larger windows. `network_save` now saves payloads to disk on the server by default (`return=file` or `return=save`); set `return=binary` only when the client needs the body streamed back.
+- The default save location for MCP downloads follows the config directory (`<roderik base>/user_data/downloads`), matching CLI behaviour even when the server binary runs from another working directory.
 - Runtime toggles now work in-session: `roderik netlog enable|disable|status` flips or reports the logging flag without restarting, and the `network_set_logging` MCP tool mirrors the same capability for remote clients (omit `enabled` to query the current state).
 - Response bodies are fetched lazily via `Network.getResponseBody` and cached in-memory per request. Existing stderr output for `-n/--net-activity` remains unchanged while the structured log accumulates metadata for filtering and persistence.
 - The `roderik ai` assistant now advertises the same `network_list`, `network_save`, and `network_set_logging` tools as the MCP server, so both interfaces surface identical network-inspection capabilities.
+
+## Desktop Attach Quirks (2025-10-30)
+
+- When the MCP GUI browser reconnects after a server restart, sending a fresh `load_url` can spawn a second Chrome window in desktop attach mode. We currently reload to regain event streams; operators should close the redundant window manually until we add a smarter reattach flow.
