@@ -930,6 +930,17 @@ func networkSaveHandler(ctx context.Context, args map[string]interface{}) (aitoo
 		returnMode = "file"
 	}
 	filenameOverride := strings.TrimSpace(mcp.ExtractString(args, "filename"))
+	filenamePrefix := strings.TrimSpace(mcp.ExtractString(args, "filename_prefix"))
+	filenameSuffix := strings.TrimSpace(mcp.ExtractString(args, "filename_suffix"))
+	timestampFormat := strings.TrimSpace(mcp.ExtractString(args, "timestamp_format"))
+	includeTimestamp := false
+	if rawTimestamp, ok := args["filename_timestamp"]; ok {
+		if ts, okBool := toBool(rawTimestamp); okBool {
+			includeTimestamp = ts
+		} else {
+			return aitools.Result{}, fmt.Errorf("network_save: filename_timestamp must be boolean")
+		}
+	}
 
 	log := getActiveEventLog()
 	if log == nil {
@@ -964,10 +975,14 @@ func networkSaveHandler(ctx context.Context, args map[string]interface{}) (aitoo
 	if entry.Response != nil {
 		mimeType = entry.Response.MIMEType
 	}
-	baseName := suggestFilename(entry, 0)
-	if filenameOverride != "" {
-		baseName = sanitizeFilename(filenameOverride)
+	nameOpts := FileNamingOptions{
+		ExplicitName:     filenameOverride,
+		Prefix:           filenamePrefix,
+		Suffix:           filenameSuffix,
+		IncludeTimestamp: includeTimestamp,
+		TimestampFormat:  timestampFormat,
 	}
+	baseName := buildFilenameForEntry(entry, 0, nameOpts)
 
 	switch returnMode {
 	case "file", "save":

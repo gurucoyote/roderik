@@ -273,15 +273,19 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
-	s.AddTool(
-		mcp.NewTool(
-			"network_save",
-			mcp.WithDescription("Retrieve or persist the response body for a captured network request."),
-			mcp.WithString("request_id", mcp.Required(), mcp.Description("request identifier returned by network_list")),
-			mcp.WithString("return", mcp.Description("delivery mode: file (default) saves on the server, binary streams the payload, save aliases file"), mcp.Enum("file", "binary", "save"), mcp.DefaultString("file")),
-			mcp.WithString("save_dir", mcp.Description("optional directory to write the file when return=file")),
-			mcp.WithString("filename", mcp.Description("optional filename override when saving to disk")),
-		),
+		s.AddTool(
+			mcp.NewTool(
+				"network_save",
+				mcp.WithDescription("Retrieve or persist the response body for a captured network request."),
+				mcp.WithString("request_id", mcp.Required(), mcp.Description("request identifier returned by network_list")),
+				mcp.WithString("return", mcp.Description("delivery mode: file (default) saves on the server, binary streams the payload, save aliases file"), mcp.Enum("file", "binary", "save"), mcp.DefaultString("file")),
+				mcp.WithString("save_dir", mcp.Description("optional directory to write the file when return=file")),
+				mcp.WithString("filename", mcp.Description("optional filename override when saving to disk")),
+				mcp.WithString("filename_prefix", mcp.Description("optional prefix prepended to generated filenames")),
+				mcp.WithString("filename_suffix", mcp.Description("optional suffix appended before the file extension")),
+				mcp.WithBoolean("filename_timestamp", mcp.Description("include a timestamp in the filename")),
+				mcp.WithString("timestamp_format", mcp.Description("time format used when filename_timestamp is true (Go layout)")),
+			),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			log.Printf("[MCP] TOOL network_save CALLED args=%#v", req.Params.Arguments)
 			res, err := aitools.Call(ctx, "network_save", req.Params.Arguments)

@@ -17,18 +17,22 @@ import (
 )
 
 var (
-	netlogMIMEs       []string
-	netlogSuffixes    []string
-	netlogStatuses    []int
-	netlogContains    []string
-	netlogMethods     []string
-	netlogDomains     []string
-	netlogTypes       []string
-	netlogRequestIDs  []string
-	netlogSave        bool
-	netlogSaveAll     bool
-	netlogInteractive bool
-	netlogOutputDir   string
+	netlogMIMEs                   []string
+	netlogSuffixes                []string
+	netlogStatuses                []int
+	netlogContains                []string
+	netlogMethods                 []string
+	netlogDomains                 []string
+	netlogTypes                   []string
+	netlogRequestIDs              []string
+	netlogSave                    bool
+	netlogSaveAll                 bool
+	netlogInteractive             bool
+	netlogOutputDir               string
+	netlogFilenamePrefix          string
+	netlogFilenameSuffix          string
+	netlogFilenameUseTimestamp    bool
+	netlogFilenameTimestampFormat string
 )
 
 var netlogEnableCmd = &cobra.Command{
@@ -157,6 +161,10 @@ func init() {
 	netlogCmd.Flags().BoolVar(&netlogSaveAll, "all", false, "When saving, include all filtered entries without prompting")
 	netlogCmd.Flags().BoolVar(&netlogInteractive, "interactive", StdoutIsTerminal(), "When saving, prompt for entries to persist")
 	netlogCmd.Flags().StringVar(&netlogOutputDir, "output", defaultDownloadsDir(), "Directory to write captured resources")
+	netlogCmd.Flags().StringVar(&netlogFilenamePrefix, "filename-prefix", "", "Optional filename prefix when saving")
+	netlogCmd.Flags().StringVar(&netlogFilenameSuffix, "filename-suffix", "", "Optional filename suffix when saving")
+	netlogCmd.Flags().BoolVar(&netlogFilenameUseTimestamp, "filename-timestamp", false, "Include a timestamp in saved filenames")
+	netlogCmd.Flags().StringVar(&netlogFilenameTimestampFormat, "filename-timestamp-format", "2006-01-02_150405", "Go time format for timestamps when --filename-timestamp is set")
 }
 
 func printNetlogEntries(entries []*NetworkLogEntry) {
@@ -253,14 +261,19 @@ func saveNetworkEntriesToDisk(entries []*NetworkLogEntry, dir string) ([]network
 		}
 		used := make(map[string]int)
 		out := make([]networkSaveResult, 0, len(entries))
+		nameOpts := FileNamingOptions{
+			Prefix:           netlogFilenamePrefix,
+			Suffix:           netlogFilenameSuffix,
+			IncludeTimestamp: netlogFilenameUseTimestamp,
+			TimestampFormat:  netlogFilenameTimestampFormat,
+		}
 		for idx, entry := range entries {
 			data, err := retrieveNetworkBody(Page, entry)
 			if err != nil {
 				out = append(out, networkSaveResult{Entry: entry, Err: err})
 				continue
 			}
-			base := suggestFilename(entry, idx)
-			name := ensureUniqueFilename(dir, base, used)
+			name := ensureUniqueFilename(dir, buildFilenameForEntry(entry, idx, nameOpts), used)
 			fullPath := filepath.Join(dir, name)
 			if writeErr := os.WriteFile(fullPath, data, 0o644); writeErr != nil {
 				out = append(out, networkSaveResult{Entry: entry, Err: writeErr})

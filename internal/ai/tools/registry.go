@@ -169,6 +169,10 @@ var definitions = []Definition{
 			{Name: "return", Type: ParamString, Description: "delivery mode: file (default) saves on the server, binary streams the payload (save aliases file)", Enum: []string{"file", "binary", "save"}},
 			{Name: "save_dir", Type: ParamString, Description: "optional directory to write the file when return=file"},
 			{Name: "filename", Type: ParamString, Description: "optional filename override when saving to disk"},
+			{Name: "filename_prefix", Type: ParamString, Description: "optional prefix prepended to generated filenames"},
+			{Name: "filename_suffix", Type: ParamString, Description: "optional suffix appended before the file extension"},
+			{Name: "filename_timestamp", Type: ParamBoolean, Description: "include a timestamp in the filename"},
+			{Name: "timestamp_format", Type: ParamString, Description: "Go time format used when filename_timestamp is true"},
 		},
 	},
 	{

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-rod/rod"
 )
@@ -195,6 +196,9 @@ func TestNetworkSaveHandlerDefaultsToServerFile(t *testing.T) {
 	if filepath.Dir(res.FilePath) != tmpDir {
 		t.Fatalf("expected file saved under %q, got %q", tmpDir, filepath.Dir(res.FilePath))
 	}
+	if filepath.Base(res.FilePath) != "resource.bin" {
+		t.Fatalf("expected filename resource.bin, got %q", filepath.Base(res.FilePath))
+	}
 
 	data, err := os.ReadFile(res.FilePath)
 	if err != nil {
@@ -261,5 +265,67 @@ func TestNetworkSaveHandlerBinaryModeReturnsPayload(t *testing.T) {
 	}
 	if !strings.Contains(res.Text, "retrieved") {
 		t.Fatalf("expected response text to indicate retrieval, got %q", res.Text)
+	}
+}
+
+func TestNetworkSaveHandlerCustomNamingOptions(t *testing.T) {
+	prevLog := getActiveEventLog()
+	prevBrowser := Browser
+	prevPage := Page
+	t.Cleanup(func() {
+		setActiveEventLog(prevLog)
+		Browser = prevBrowser
+		Page = prevPage
+	})
+
+	Browser = &rod.Browser{}
+	Page = &rod.Page{}
+
+	log := newNetworkEventLog()
+	body := []byte("custom-name-data")
+	ts := time.Date(2025, 10, 30, 12, 45, 0, 0, time.UTC)
+	entry := &NetworkLogEntry{
+		RequestID:        "req-custom",
+		URL:              "https://example.com/voice",
+		Method:           "GET",
+		RequestTimestamp: ts,
+		Response: &NetworkResponseInfo{
+			MIMEType:          "audio/ogg",
+			ResponseTimestamp: ts,
+		},
+		Body: &NetworkBody{
+			Data: body,
+		},
+	}
+	log.entries["req-custom"] = entry
+	log.order = append(log.order, "req-custom")
+	setActiveEventLog(log)
+
+	tmpDir := t.TempDir()
+	args := map[string]interface{}{
+		"request_id":         "req-custom",
+		"save_dir":           tmpDir,
+		"filename_prefix":    "username",
+		"filename_suffix":    "clip",
+		"filename_timestamp": true,
+		"timestamp_format":   "2006-01-02_150405",
+	}
+
+	res, err := networkSaveHandler(context.Background(), args)
+	if err != nil {
+		t.Fatalf("networkSaveHandler returned error: %v", err)
+	}
+
+	wantBase := "username_2025-10-30_124500_voice_clip.ogg"
+	if filepath.Base(res.FilePath) != wantBase {
+		t.Fatalf("expected filename %q, got %q", wantBase, filepath.Base(res.FilePath))
+	}
+
+	data, err := os.ReadFile(res.FilePath)
+	if err != nil {
+		t.Fatalf("reading saved file: %v", err)
+	}
+	if string(data) != string(body) {
+		t.Fatalf("expected saved file contents %q, got %q", string(body), string(data))
 	}
 }
