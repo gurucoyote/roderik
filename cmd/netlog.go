@@ -304,7 +304,8 @@ func suggestFilename(entry *NetworkLogEntry, index int) string {
 	base = strings.Split(base, "?")[0]
 	base = strings.Split(base, "#")[0]
 	if base == "" || base == "." || base == "/" {
-		base = fmt.Sprintf("%s_%s", strings.ToLower(entry.Method), entry.RequestID)
+		safeID := strings.ReplaceAll(entry.RequestID, ".", "_")
+		base = fmt.Sprintf("%s_%s", strings.ToLower(entry.Method), safeID)
 	}
 	base = sanitizeFilename(base)
 	if ext := filepath.Ext(base); ext == "" {
