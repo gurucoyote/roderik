@@ -18,6 +18,8 @@
 - Persist each clip via `network_save`, passing the request ID from the listing plus naming options: set `filename_prefix` to the sender (sanitized), enable `filename_timestamp` with a format such as `2006-01-02_150405`, and use `filename_suffix` like `voice` or the duration (e.g., `00m32s`). Example args: `{"request_id":"1234.5","filename_prefix":"alice","filename_suffix":"voice","filename_timestamp":true,"timestamp_format":"2006-01-02_150405"}`.
 - Saved files default to `user_data/downloads/`; repeat the `network_save` call per voice message so each gets the correct sender/time label. If multiple clips share the same sender, rerun with updated suffixes rather than relying on one bulk save.
 
+> For a deeper R&D experiment that mines Messenger’s existing GraphQL traffic (still only observing what the browser already fetched) to improve labeling and timestamping of voice messages, see `docs/messenger-graphql-rnd.md`.
+
 ### Messenger Voice Message Bulk Download & Labeling
 - With Messenger open on the desired thread, run a DOM sweep (`run_js`) that collects voice bubbles in page order, capturing the timestamp label (e.g. “Today at 4:52PM”), derived slug (`timestampKey`), and duration (seconds + `00m00s` format). Store this list for pairing.
 - Call `network_list` with `{"mime":["audio"],"type":["Media"],"limit":N,"tail":false}` (set `N` to the number of voice bubbles you saw) to retrieve the audio requests in chronological order. Confirm the count matches your DOM list; if not, re-play clips until it does.

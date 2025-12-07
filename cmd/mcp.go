@@ -273,19 +273,19 @@ func runMCP(cmd *cobra.Command, args []string) {
 		},
 	)
 
-		s.AddTool(
-			mcp.NewTool(
-				"network_save",
-				mcp.WithDescription("Retrieve or persist the response body for a captured network request."),
-				mcp.WithString("request_id", mcp.Required(), mcp.Description("request identifier returned by network_list")),
-				mcp.WithString("return", mcp.Description("delivery mode: file (default) saves on the server, binary streams the payload, save aliases file"), mcp.Enum("file", "binary", "save"), mcp.DefaultString("file")),
-				mcp.WithString("save_dir", mcp.Description("optional directory to write the file when return=file")),
-				mcp.WithString("filename", mcp.Description("optional filename override when saving to disk")),
-				mcp.WithString("filename_prefix", mcp.Description("optional prefix prepended to generated filenames")),
-				mcp.WithString("filename_suffix", mcp.Description("optional suffix appended before the file extension")),
-				mcp.WithBoolean("filename_timestamp", mcp.Description("include a timestamp in the filename")),
-				mcp.WithString("timestamp_format", mcp.Description("time format used when filename_timestamp is true (Go layout)")),
-			),
+	s.AddTool(
+		mcp.NewTool(
+			"network_save",
+			mcp.WithDescription("Retrieve or persist the response body for a captured network request."),
+			mcp.WithString("request_id", mcp.Required(), mcp.Description("request identifier returned by network_list")),
+			mcp.WithString("return", mcp.Description("delivery mode: file (default) saves on the server, binary streams the payload, save aliases file"), mcp.Enum("file", "binary", "save"), mcp.DefaultString("file")),
+			mcp.WithString("save_dir", mcp.Description("optional directory to write the file when return=file")),
+			mcp.WithString("filename", mcp.Description("optional filename override when saving to disk")),
+			mcp.WithString("filename_prefix", mcp.Description("optional prefix prepended to generated filenames")),
+			mcp.WithString("filename_suffix", mcp.Description("optional suffix appended before the file extension")),
+			mcp.WithBoolean("filename_timestamp", mcp.Description("include a timestamp in the filename")),
+			mcp.WithString("timestamp_format", mcp.Description("time format used when filename_timestamp is true (Go layout)")),
+		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			log.Printf("[MCP] TOOL network_save CALLED args=%#v", req.Params.Arguments)
 			res, err := aitools.Call(ctx, "network_save", req.Params.Arguments)
@@ -426,6 +426,25 @@ func runMCP(cmd *cobra.Command, args []string) {
 			}
 			log.Printf("[MCP] TOOL duck RESULT first100=%q", out[:min(len(out), 100)])
 			return mcp.NewToolResultText(out), nil
+		},
+	)
+
+	// === YouTube transcript download ===
+	s.AddTool(
+		mcp.NewTool(
+			"yttrans",
+			mcp.WithDescription("Download a YouTube transcript via yt-dlp, cache it locally, and return cleaned text."),
+			mcp.WithString("url", mcp.Required(), mcp.Description("YouTube video URL")),
+			mcp.WithString("language", mcp.Description("Transcript language code (default en)")),
+			mcp.WithString("output_folder", mcp.Description("Folder for cached transcripts (default ./yttrans-cache)")),
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			log.Printf("[MCP] TOOL yttrans CALLED args=%#v", req.Params.Arguments)
+			res, err := aitools.Call(ctx, "yttrans", req.Params.Arguments)
+			if err != nil {
+				return nil, err
+			}
+			return resultToMCP(res)
 		},
 	)
 

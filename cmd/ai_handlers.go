@@ -55,6 +55,7 @@ func registerHandlers() {
 		aitools.RegisterHandler("describe", describeHandler)
 		aitools.RegisterHandler("xpath", xpathHandler)
 		aitools.RegisterHandler("duck", duckHandler)
+		aitools.RegisterHandler("yttrans", yttransHandler)
 		aitools.RegisterHandler("network_list", networkListHandler)
 		aitools.RegisterHandler("network_save", networkSaveHandler)
 		aitools.RegisterHandler("network_set_logging", networkSetLoggingHandler)
@@ -576,6 +577,40 @@ func duckHandler(ctx context.Context, args map[string]interface{}) (aitools.Resu
 	}
 
 	return aitools.Result{Text: b.String()}, nil
+}
+
+func yttransHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
+	toolDebug("[TOOLS] yttrans CALLED args=%#v", args)
+
+	url := strings.TrimSpace(mcp.ExtractString(args, "url"))
+	if url == "" {
+		return aitools.Result{}, fmt.Errorf("yttrans: url argument is required")
+	}
+	language := strings.TrimSpace(mcp.ExtractString(args, "language"))
+	if language == "" {
+		language = strings.TrimSpace(ytLanguage)
+	}
+	if language == "" {
+		language = "en"
+	}
+	outputFolder := strings.TrimSpace(mcp.ExtractString(args, "output_folder"))
+	if outputFolder == "" {
+		outputFolder = strings.TrimSpace(ytOutputFolder)
+	}
+	if outputFolder == "" {
+		outputFolder = "./yttrans-cache"
+	}
+	res, err := DownloadAndProcessTranscript(TranscriptOptions{
+		Language:     language,
+		URL:          url,
+		OutputFolder: outputFolder,
+	})
+	if err != nil {
+		return aitools.Result{}, err
+	}
+	summary := fmt.Sprintf("Transcript saved to %s (video=%s, language=%s).", res.TextPath, res.VideoID, res.Language)
+	toolDebug("[TOOLS] yttrans RESULT chars=%d path=%s", len(res.Text), res.TextPath)
+	return aitools.Result{Text: summary + "\n\n" + res.Text}, nil
 }
 
 func searchHandler(ctx context.Context, args map[string]interface{}) (aitools.Result, error) {
